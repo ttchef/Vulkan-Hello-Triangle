@@ -6,12 +6,14 @@
 
 #include <vulkan/vulkan.h>
 
+#define ARRAY_COUNT(array) (sizeof(array) / sizeof(array[0]))
+
 typedef struct {
     VkInstance instance;
 } VulkanContext;
 
-VulkanContext* initVulkan();
-bool initVulkanInstance(VulkanContext* context);
+VulkanContext* initVulkan(uint32_t glfwExtensionCount, const char** glfwExtensions);
+bool initVulkanInstance(VulkanContext* context, uint32_t glfwExtensionCount, const char** glfwExtensions);
 
 #endif // VULKAN_BASE_H
       

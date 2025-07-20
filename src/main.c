@@ -26,7 +26,12 @@ int main() {
         return -1;
     }
 
-    VulkanContext* context = initVulkan();
+    uint32_t glfwExtensionCount = 0;
+    const char** glfwExtensions;
+
+    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+    VulkanContext* context = initVulkan(glfwExtensionCount, glfwExtensions);
     if (!context) {
         fprintf(stderr, "Failed to create vulkan context!\n");
         return -1;
