@@ -8,7 +8,7 @@ OBJ = $(SRC:.c=.o)
 
 TARGET = main
 
-all: $(TARGET)
+all: run
 	
 %.o: %.c
 	$(CC) -c $< -o $@ $(CFLAGS) 
@@ -16,6 +16,9 @@ all: $(TARGET)
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
  
+run: $(TARGET)
+	./$(TARGET)
+
 clean:
 	rm -rf $(TARGET) $(OBJ)
 

@@ -5,6 +5,43 @@
 #include "../include/vulkan_base.h"
 
 #include <darray/darray.h>
+#include <vulkan/vulkan_core.h>
+
+bool selectPhysicalDevice(VulkanContext *context) {
+    uint32_t numDevices;
+    vkEnumeratePhysicalDevices(context->instance, &numDevices, NULL);
+    if (numDevices == 0) {
+        fprintf(stderr, "Failed to find a fitting vulkan GPU");
+        context->physicalDevice = 0;
+        return false;
+    }
+
+    VkPhysicalDevice* physicalDevices = malloc(sizeof(VkPhysicalDevice) * numDevices);
+    if (!physicalDevices) {
+        fprintf(stderr, "Failed to allocate memory for all physical devices!\n");
+        context->physicalDevice = 0;
+        return false;
+    }
+
+    vkEnumeratePhysicalDevices(context->instance, &numDevices, physicalDevices);
+    printf("Found: %d GPUs\n", numDevices);
+
+    for (uint32_t i = 0; i < numDevices; i++) {
+        VkPhysicalDeviceProperties deviceProperties = {0};
+        vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
+        printf("Found GPU: %s\n", deviceProperties.deviceName);
+    }
+
+    VkPhysicalDeviceProperties selectedDeviceProperties = {0};
+    vkGetPhysicalDeviceProperties(physicalDevices[0], &selectedDeviceProperties);
+    printf("Will select %s GPU!\n", selectedDeviceProperties.deviceName);
+    context->physicalDevice = physicalDevices[0];
+    context->physicalDeviceProperties = selectedDeviceProperties;
+
+    free(physicalDevices);
+
+    return true;
+}
 
 bool initVulkanInstance(VulkanContext* context, uint32_t glfwExtensionCount, const char** glfwExtensions) {
 
@@ -37,6 +74,8 @@ bool initVulkanInstance(VulkanContext* context, uint32_t glfwExtensionCount, con
             return false;
         }
     }
+    
+    free(layerProperties);
 
     VkApplicationInfo appInfo = {0};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -70,9 +109,9 @@ VulkanContext* initVulkan(uint32_t glfwExtensionCount, const char** glfwExtensio
         return NULL;
     }
 
-    if (!initVulkanInstance(context, glfwExtensionCount, glfwExtensions)) {
-        return NULL;
-    }
+    if (!initVulkanInstance(context, glfwExtensionCount, glfwExtensions)) return NULL;
+    if (!selectPhysicalDevice(context)) return NULL;
+
 
     return context;
 }
