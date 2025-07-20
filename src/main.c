@@ -1,13 +1,47 @@
 
 #include <stdio.h>
 
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
 // own libs
 #include <darray/darray.h>
 #include <drings/drings.h>
 
+#include "../include/vulkan_base.h"
+
 int main() {
 
-    printf("Hello World\n");
+    if (!glfwInit()) {
+        fprintf(stderr, "Failed to initialize glfw!\n");
+        return -1;
+    }
+
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
+    GLFWwindow* window = glfwCreateWindow(800, 600, "Vulkan C yeahh", NULL, NULL);
+    if (!window) {
+        fprintf(stderr, "Failed to create glfw window\n");
+        glfwTerminate();
+        return -1;
+    }
+
+    VulkanContext* context = initVulkan();
+    if (!context) {
+        fprintf(stderr, "Failed to create vulkan context!\n");
+        return -1;
+    }
+
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+    }
+
+    free(context);
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
 
     return 0;
 }
+
+

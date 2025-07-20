@@ -1,6 +1,6 @@
 
 CC = gcc
-CFLAGS = -Wall -g
+CFLAGS = -Wall -g -Iinclude
 LDFLAGS =  -l:libdarray.a -l:libdrings.a -lglfw -lm -lglfw -lvulkan
 
 SRC = $(wildcard src/*.c)
