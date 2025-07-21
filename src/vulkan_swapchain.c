@@ -57,6 +57,14 @@ VulkanSwapchain createSwapchain(VulkanContext* context, VkSurfaceKHR surface, Vk
     createInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     createInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+
+    if (surfaceCapabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) {
+        createInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    }
+    else {
+        createInfo.preTransform = surfaceCapabilities.currentTransform;
+    }
+
         
     if (vkCreateSwapchainKHR(context->device, &createInfo, NULL, &result.swapchain) != VK_SUCCESS) {
         fprintf(stderr, "Failed to create vulkan swapchain!\n");

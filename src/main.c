@@ -19,6 +19,7 @@ VkFramebuffer* framebuffers;
 VkCommandPool commandPool;
 VkCommandBuffer commandBuffer;
 VkFence fence;
+VulkanPipeline pipeline;
 
 void initApplication(GLFWwindow* window) {
     uint32_t glfwExtensionCount = 0;
@@ -66,6 +67,8 @@ void initApplication(GLFWwindow* window) {
             return;
         }
     }   
+
+    pipeline = createPipeline(context, "shaders/triangle_vert.spv", "shaders/triangle_frag.spv", renderPass, swapchain.width, swapchain.height);
 
     {
         VkFenceCreateInfo createInfo = {0};
@@ -147,6 +150,10 @@ void renderApplication() {
             
         vkCmdBeginRenderPass(commandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
+
+        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
         vkCmdEndRenderPass(commandBuffer);
     }
 
@@ -171,10 +178,6 @@ void renderApplication() {
 
     vkQueueSubmit(context->graphicsQueue.queue, 1, &submitInfo, 0);
  
-    if (vkDeviceWaitIdle(context->device) != VK_SUCCESS) {
-        fprintf(stderr, "Failed to wait for logical device!\n");
-        return;
-    }
 
     VkPresentInfoKHR presentInfo = {0};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -190,6 +193,8 @@ void shutdownApplication() {
 
     vkDestroyFence(context->device, fence, NULL);
     vkDestroyCommandPool(context->device, commandPool, NULL);
+
+    destroyPipeline(context, &pipeline);
 
     for (uint32_t i = 0; i < swapchain.imagesCount; i++) {
         vkDestroyFramebuffer(context->device, framebuffers[i], NULL);
@@ -223,6 +228,7 @@ int main() {
     initApplication(window);
 
     while (!glfwWindowShouldClose(window)) {
+        renderApplication();
         glfwPollEvents();
     }
 

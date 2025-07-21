@@ -27,6 +27,11 @@ typedef struct {
 } VulkanSwapchain;
 
 typedef struct {
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+} VulkanPipeline;
+
+typedef struct {
     VkInstance instance;
     VkPhysicalDevice physicalDevice;
     VkPhysicalDeviceProperties physicalDeviceProperties;
@@ -50,6 +55,12 @@ void destroySwapchain(VulkanContext* context, VulkanSwapchain* swapchain);
 // vulkan_renderpass.c 
 VkRenderPass createRenderPass(VulkanContext* context, VkFormat format);
 void destroyRenderPass(VulkanContext* context, VkRenderPass renderPass);
+
+// vulkan_pipeline.c 
+VkShaderModule createShaderModule(VulkanContext* context, const char* filepath);
+VulkanPipeline createPipeline(VulkanContext* context, const char* vertPath, const char* fragPath,
+        VkRenderPass renderPass, uint32_t width, uint32_t height);
+void destroyPipeline(VulkanContext* context, VulkanPipeline* pipeline);
 
 #endif // VULKAN_BASE_H
       
