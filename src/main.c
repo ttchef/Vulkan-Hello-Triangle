@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <vulkan/vulkan_core.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -31,16 +32,30 @@ int main() {
 
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-    VulkanContext* context = initVulkan(glfwExtensionCount, glfwExtensions, 0, 0);
+    const char* enabledDeviceExtensions[] = {
+        "VK_KHR_swapchain"
+    };
+
+    VulkanContext* context = initVulkan(glfwExtensionCount, glfwExtensions, ARRAY_COUNT(enabledDeviceExtensions), enabledDeviceExtensions);
     if (!context) {
         fprintf(stderr, "Failed to create vulkan context!\n");
         return -1;
     }
 
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    if (glfwCreateWindowSurface(context->instance, window, NULL, &surface) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to create window surface!\n");
+        return -1;
+    }
+
+    VulkanSwapchain swapchain = createSwapchain(context, surface, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
     }
 
+    destroySwapchain(context, &swapchain);
+    vkDestroySurfaceKHR(context->instance, surface, NULL);
     exitVulkan(context);
     free(context);
 

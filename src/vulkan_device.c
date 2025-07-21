@@ -25,6 +25,8 @@ bool createLogicalDevice(VulkanContext *context, uint32_t deviceExtensionCount, 
         }
     }
 
+    free(queueFamilies);
+
     float priorities[] = { 1.0f };
     VkDeviceQueueCreateInfo queueCreateInfo = {0};
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;

@@ -15,6 +15,14 @@ typedef struct {
 } VulkanQueue;
 
 typedef struct {
+    VkSwapchainKHR swapchain;
+    VkImage* images;
+    uint32_t width;
+    uint32_t height;
+    VkFormat format;
+} VulkanSwapchain;
+
+typedef struct {
     VkInstance instance;
     VkPhysicalDevice physicalDevice;
     VkPhysicalDeviceProperties physicalDeviceProperties;
@@ -25,10 +33,15 @@ typedef struct {
 VulkanContext* initVulkan(uint32_t glfwExtensionCount, const char** glfwExtensions,
         uint32_t deviceExtensionCount, const char** deviceExtensions);
 
+// vulkan_device.c
 bool initVulkanInstance(VulkanContext* context, uint32_t glfwExtensionCount, const char** glfwExtensions);
 bool selectPhysicalDevice(VulkanContext* context);
 bool createLogicalDevice(VulkanContext* context, uint32_t deviceExtensionCount, const char** deviceExtensions);
 void exitVulkan(VulkanContext* context);
+
+// vulkan_swapchain.c 
+VulkanSwapchain createSwapchain(VulkanContext* context, VkSurfaceKHR surface, VkImageUsageFlags usage);
+void destroySwapchain(VulkanContext* context, VulkanSwapchain* swapchain);
 
 #endif // VULKAN_BASE_H
       
