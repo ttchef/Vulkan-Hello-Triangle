@@ -1,5 +1,8 @@
 
 main
+
 *.o
 src/*.o
 
+*.spv
+shaders/*.spv
