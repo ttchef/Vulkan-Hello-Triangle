@@ -13,11 +13,15 @@ all: run
 %.o: %.c
 	$(CC) -c $< -o $@ $(CFLAGS) 
 
-$(TARGET): $(OBJ)
+$(TARGET): $(OBJ) 
+	./compile.sh
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
  
 run: $(TARGET)
 	./$(TARGET)
+
+comp_shaders: 
+	./compile.sh
 
 clean:
 	rm -rf $(TARGET) $(OBJ)
