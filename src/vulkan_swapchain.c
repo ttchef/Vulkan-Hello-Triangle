@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <vulkan/vulkan_core.h>
 
 #include "../include/vulkan_base.h"
 
@@ -68,6 +69,7 @@ VulkanSwapchain createSwapchain(VulkanContext* context, VkSurfaceKHR surface, Vk
 
     uint32_t numImages = 0;
     vkGetSwapchainImagesKHR(context->device, result.swapchain, &numImages, NULL);
+    result.imagesCount = numImages;
 
     // Acquire swapchain images 
     result.images = malloc(sizeof(VkImage) * numImages);
@@ -78,6 +80,28 @@ VulkanSwapchain createSwapchain(VulkanContext* context, VkSurfaceKHR surface, Vk
 
     vkGetSwapchainImagesKHR(context->device, result.swapchain, &numImages, result.images);
 
+    // create image views 
+    result.imageViews = malloc(sizeof(VkImageView) * numImages);
+    if (!result.imageViews) {
+        fprintf(stderr, "Failed to allocate memory for image views!\n");
+        return result;
+    }
+    for (uint32_t i = 0; i < numImages; i++) {
+        VkImageViewCreateInfo createInfo = {0};
+        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        createInfo.image = result.images[i];
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.format = format;
+        createInfo.components = (VkComponentMapping){0};
+        createInfo.subresourceRange = (VkImageSubresourceRange){ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+        if (vkCreateImageView(context->device, &createInfo, NULL, &result.imageViews[i]) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to create image views!\n");
+            return result;
+        }
+
+    }
+
     free(availableFormats);
     return result;
 }
@@ -87,6 +111,15 @@ void destroySwapchain(VulkanContext *context, VulkanSwapchain *swapchain) {
     if (swapchain->images) {
         free(swapchain->images);
         swapchain->images = NULL;
+    }
+    
+    for (uint32_t i = 0; i < swapchain->imagesCount; i++) {
+        vkDestroyImageView(context->device, swapchain->imageViews[i], NULL);
+    }
+
+    if (swapchain->imageViews) {
+        free(swapchain->imageViews);
+        swapchain->imageViews = NULL;
     }
 
     vkDestroySwapchainKHR(context->device, swapchain->swapchain, 0);

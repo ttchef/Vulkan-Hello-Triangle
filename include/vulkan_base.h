@@ -16,7 +16,11 @@ typedef struct {
 
 typedef struct {
     VkSwapchainKHR swapchain;
+
     VkImage* images;
+    VkImageView* imageViews;
+    uint32_t imagesCount;
+
     uint32_t width;
     uint32_t height;
     VkFormat format;
@@ -42,6 +46,10 @@ void exitVulkan(VulkanContext* context);
 // vulkan_swapchain.c 
 VulkanSwapchain createSwapchain(VulkanContext* context, VkSurfaceKHR surface, VkImageUsageFlags usage);
 void destroySwapchain(VulkanContext* context, VulkanSwapchain* swapchain);
+
+// vulkan_renderpass.c 
+VkRenderPass createRenderPass(VulkanContext* context, VkFormat format);
+void destroyRenderPass(VulkanContext* context, VkRenderPass renderPass);
 
 #endif // VULKAN_BASE_H
       
