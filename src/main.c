@@ -20,6 +20,8 @@ VkCommandPool commandPool;
 VkCommandBuffer commandBuffer;
 VkFence fence;
 VulkanPipeline pipeline;
+VkSemaphore acrquireSemaphore;
+VkSemaphore releaseSemaphore;
 
 void initApplication(GLFWwindow* window) {
     uint32_t glfwExtensionCount = 0;
@@ -73,12 +75,25 @@ void initApplication(GLFWwindow* window) {
     {
         VkFenceCreateInfo createInfo = {0};
         createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        createInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
         if (vkCreateFence(context->device, &createInfo, NULL, &fence) != VK_SUCCESS) {
             fprintf(stderr, "Failed to create fence!\n");
             return;
         }
+    }
 
+    {
+        VkSemaphoreCreateInfo createInfo = {0};
+        createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        if (vkCreateSemaphore(context->device, &createInfo, NULL, &acrquireSemaphore) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to create semaphore!\n");
+            exit(1);
+        }
+        if (vkCreateSemaphore(context->device, &createInfo, NULL, &releaseSemaphore) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to create semaphore!\n");
+            exit(1);
+        }
     }
 
     {
@@ -117,8 +132,17 @@ void renderApplication() {
 
     uint32_t imageIndex = 0;
 
+    if (vkWaitForFences(context->device, 1, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to wait for fences!\n");
+        return;
+    }
+    if (vkResetFences(context->device, 1, &fence) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to reset fences!\n");
+        return;
+    }
+
     // getting image from swapchain
-    vkAcquireNextImageKHR(context->device, swapchain.swapchain, UINT64_MAX, 0, fence, &imageIndex);
+    vkAcquireNextImageKHR(context->device, swapchain.swapchain, UINT64_MAX, acrquireSemaphore, 0, &imageIndex);
 
     // reset command pool
     if (vkResetCommandPool(context->device, commandPool, 0) != VK_SUCCESS) {
@@ -135,6 +159,7 @@ void renderApplication() {
         return;
     }
 
+    
     {
         VkClearValue clearValue = {
             .color = { {1.0f, greenChannel, 1.0, 1.0f} }
@@ -162,28 +187,28 @@ void renderApplication() {
         return;
     }
 
-    if (vkWaitForFences(context->device, 1, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
-        fprintf(stderr, "Failed to wait for fences!\n");
-        return;
-    }
-    if (vkResetFences(context->device, 1, &fence) != VK_SUCCESS) {
-        fprintf(stderr, "Failed to reset fences!\n");
-        return;
-    }
-
     // send to graphicsQueue
     VkSubmitInfo submitInfo = {0};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &acrquireSemaphore;
 
-    vkQueueSubmit(context->graphicsQueue.queue, 1, &submitInfo, 0);
- 
+    VkPipelineStageFlags waitMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    submitInfo.pWaitDstStageMask = &waitMask;
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &releaseSemaphore;
+    vkQueueSubmit(context->graphicsQueue.queue, 1, &submitInfo, fence);
 
     VkPresentInfoKHR presentInfo = {0};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &swapchain.swapchain;
     presentInfo.pImageIndices = &imageIndex;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &releaseSemaphore;
 
     vkQueuePresentKHR(context->graphicsQueue.queue, &presentInfo);
 }
