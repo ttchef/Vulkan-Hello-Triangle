@@ -1,6 +1,7 @@
 
 #include <stdio.h>
-#include <vulkan/vulkan_core.h>
+#include <math.h>
+#include <time.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -127,7 +128,7 @@ void initApplication(GLFWwindow* window) {
 void renderApplication() {
 
     static float greenChannel = 0.0f;
-    greenChannel += 0.01f;
+    greenChannel = (sin(glfwGetTime()) + 1) / 2;
     if (greenChannel > 1.0f) greenChannel = 0.0f;
 
     uint32_t imageIndex = 0;
@@ -217,6 +218,9 @@ void shutdownApplication() {
     vkDeviceWaitIdle(context->device);
 
     vkDestroyFence(context->device, fence, NULL);
+    vkDestroySemaphore(context->device, acrquireSemaphore, NULL);
+    vkDestroySemaphore(context->device, releaseSemaphore, NULL);
+
     vkDestroyCommandPool(context->device, commandPool, NULL);
 
     destroyPipeline(context, &pipeline);
