@@ -7,6 +7,52 @@
 #include <darray/darray.h>
 #include <vulkan/vulkan_core.h>
 
+bool createLogicalDevice(VulkanContext *context, uint32_t deviceExtensionCount, const char** deviceExtensions) {
+    
+    // Queues
+    uint32_t numQueueFamilies = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(context->physicalDevice, &numQueueFamilies, NULL);
+
+    VkQueueFamilyProperties* queueFamilies = malloc(sizeof(VkQueueFamilyProperties) * numQueueFamilies);
+    vkGetPhysicalDeviceQueueFamilyProperties(context->physicalDevice, &numQueueFamilies, queueFamilies);
+
+    uint32_t graphicsQueueIndex = 0;
+    for (uint32_t i = 0; i < numQueueFamilies; i++) {
+        VkQueueFamilyProperties queueFamily = queueFamilies[i];;
+        if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            graphicsQueueIndex = i;
+            break;
+        }
+    }
+
+    float priorities[] = { 1.0f };
+    VkDeviceQueueCreateInfo queueCreateInfo = {0};
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.queueCount = 1;
+    queueCreateInfo.pQueuePriorities = priorities;
+
+    VkPhysicalDeviceFeatures enabledFeatures = {0};
+
+    VkDeviceCreateInfo createInfo = {0};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pEnabledFeatures = &enabledFeatures;
+    createInfo.enabledExtensionCount = deviceExtensionCount;
+    createInfo.ppEnabledExtensionNames = deviceExtensions;
+    createInfo.queueCreateInfoCount = 1;
+    createInfo.pQueueCreateInfos = &queueCreateInfo;
+    
+    if (vkCreateDevice(context->physicalDevice, &createInfo, NULL, &context->device) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to create logical device!\n");
+        return false;
+    }
+
+    // Acquire queues
+    context->graphicsQueue.familyIndex = graphicsQueueIndex;
+    vkGetDeviceQueue(context->device, graphicsQueueIndex, 0, &context->graphicsQueue.queue);
+
+    return true;
+}
+
 bool selectPhysicalDevice(VulkanContext *context) {
     uint32_t numDevices;
     vkEnumeratePhysicalDevices(context->instance, &numDevices, NULL);
@@ -102,7 +148,7 @@ bool initVulkanInstance(VulkanContext* context, uint32_t glfwExtensionCount, con
     return true;
 }
 
-VulkanContext* initVulkan(uint32_t glfwExtensionCount, const char** glfwExtensions) {
+VulkanContext* initVulkan(uint32_t glfwExtensionCount, const char** glfwExtensions, uint32_t deviceExtensionCount, const char** deviceExtensions) {
     VulkanContext* context = malloc(sizeof(VulkanContext));
     if (!context) {
         fprintf(stderr, "Failed to allocate memory for vulkan context!\n");
@@ -111,9 +157,16 @@ VulkanContext* initVulkan(uint32_t glfwExtensionCount, const char** glfwExtensio
 
     if (!initVulkanInstance(context, glfwExtensionCount, glfwExtensions)) return NULL;
     if (!selectPhysicalDevice(context)) return NULL;
-
+    if (!createLogicalDevice(context, deviceExtensionCount, deviceExtensions)) return NULL;
 
     return context;
 }
 
+
+void exitVulkan(VulkanContext *context) {
+    // wait for graphics crad to finish work
+    vkDeviceWaitIdle(context->device);
+    vkDestroyDevice(context->device, NULL);
+    vkDestroyInstance(context->instance, NULL);
+}
 

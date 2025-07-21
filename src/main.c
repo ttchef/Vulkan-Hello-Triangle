@@ -31,7 +31,7 @@ int main() {
 
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-    VulkanContext* context = initVulkan(glfwExtensionCount, glfwExtensions);
+    VulkanContext* context = initVulkan(glfwExtensionCount, glfwExtensions, 0, 0);
     if (!context) {
         fprintf(stderr, "Failed to create vulkan context!\n");
         return -1;
@@ -41,6 +41,7 @@ int main() {
         glfwPollEvents();
     }
 
+    exitVulkan(context);
     free(context);
 
     glfwDestroyWindow(window);
