@@ -29,20 +29,29 @@ VulkanPipeline pipeline;
 VkSemaphore acrquireSemaphores[FRAMES_IN_FLIGHT];
 VkSemaphore releaseSemaphores[FRAMES_IN_FLIGHT];
 VulkanBuffer vertexBuffer;
+VulkanBuffer indexBuffer;
 
 uint32_t frameIndex = 0;
 
 bool framebufferResized = false;
 
 float vertexData[] = {
-    0.0f, -0.5f,
+    0.5f, -0.5f,
     1.0f, 0.0f, 0.0f,
 
     0.5f, 0.5f,
     0.0f, 1.0f, 0.0f,
 
     -0.5f, 0.5f,
-    0.0f, 0.0f, 1.0f
+    0.0f, 0.0f, 1.0f, 
+
+    -0.5f, -0.5f, 
+    0.0f, 1.0f, 0.0f
+};
+
+uint32_t indexData[] = {
+    0, 1, 2,
+    3, 0, 2
 };
 
 void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
@@ -112,6 +121,8 @@ void initApplication(GLFWwindow* window) {
     vertexInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     vertexInputBinding.stride = sizeof(float) * 5;
 
+
+
     pipeline = createPipeline(context, "shaders/color_vert.spv", "shaders/color_frag.spv", renderPass, swapchain.width,
             swapchain.height, vertexAttributeDescriptions, ARRAY_COUNT(vertexAttributeDescriptions),
             &vertexInputBinding);
@@ -178,6 +189,18 @@ void initApplication(GLFWwindow* window) {
     memcpy(data, vertexData, sizeof(vertexData));
 
     vkUnmapMemory(context->device, vertexBuffer.memory);
+
+
+    createBuffer(context, &indexBuffer, sizeof(indexData), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+    if (vkMapMemory(context->device, indexBuffer.memory, 0, sizeof(indexData), 0, &data) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to map memory for index buffer!\n");
+        return;
+    }
+
+    memcpy(data, indexData, sizeof(indexData));
+
+    vkUnmapMemory(context->device, indexBuffer.memory);
 }
 
 void recreateRenderPass() {
@@ -305,7 +328,9 @@ void renderApplication() {
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.buffer, &offset);
 
-        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+        vkCmdBindIndexBuffer(commandBuffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+        vkCmdDrawIndexed(commandBuffer, ARRAY_COUNT(indexData), 1, 0, 0, 0);
 
         vkCmdEndRenderPass(commandBuffer);
     }
@@ -355,6 +380,7 @@ void renderApplication() {
 void shutdownApplication() {
     vkDeviceWaitIdle(context->device);
 
+    destroyBuffer(context, &indexBuffer);
     destroyBuffer(context, &vertexBuffer);
 
     for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
