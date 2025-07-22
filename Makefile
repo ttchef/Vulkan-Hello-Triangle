@@ -1,6 +1,6 @@
 
 CC = gcc
-CFLAGS = -Wall -g -Iinclude
+CFLAGS = -Wall -g -Iinclude #-fsanitize=address,undefined
 LDFLAGS =  -l:libdarray.a -l:libdrings.a -lglfw -lm -lglfw -lvulkan
 
 SRC = $(wildcard src/*.c)

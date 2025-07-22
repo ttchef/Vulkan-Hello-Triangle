@@ -1,6 +1,7 @@
 
 #include <stdio.h> 
 #include <stdlib.h>
+#include <time.h>
 #include <vulkan/vulkan_core.h>
 
 #include "../include/vulkan_base.h"
@@ -75,15 +76,16 @@ VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, cons
     inpuAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inpuAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
    
-    VkViewport viewport = (VkViewport){0.0f, 0.0f, (float)width, (float)(height)};
-    VkRect2D scissor = (VkRect2D){{0, 0}, {width, height}};
+    // Depricated because of dynamicStates
+    //VkViewport viewport = (VkViewport){0.0f, 0.0f, (float)width, (float)(height)};
+    //VkRect2D scissor = (VkRect2D){{0, 0}, {width, height}};
     
     VkPipelineViewportStateCreateInfo viewportState = {0};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
-    viewportState.pViewports = &viewport;
+    //viewportState.pViewports = &viewport;
     viewportState.scissorCount = 1;
-    viewportState.pScissors = &scissor;
+    //viewportState.pScissors = &scissor;
 
     VkPipelineRasterizationStateCreateInfo rasterizationState = {0};
     rasterizationState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -102,6 +104,12 @@ VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, cons
     colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlendState.attachmentCount = 1;
     colorBlendState.pAttachments = &colorBlendAttachment;
+
+    VkPipelineDynamicStateCreateInfo dynamicState = {0};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    dynamicState.dynamicStateCount = ARRAY_COUNT(dynamicStates);
+    dynamicState.pDynamicStates = dynamicStates;
 
     VkPipelineLayout pipelineLayout;
 
@@ -128,6 +136,7 @@ VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, cons
         createInfo.pRasterizationState = &rasterizationState;
         createInfo.pMultisampleState = &multisampleState;
         createInfo.pColorBlendState = &colorBlendState;
+        createInfo.pDynamicState = &dynamicState;
         createInfo.layout = pipelineLayout;
         createInfo.renderPass = renderPass;
         createInfo.subpass = 0;

@@ -49,7 +49,7 @@ bool createLogicalDevice(VulkanContext* context, uint32_t deviceExtensionCount, 
 void exitVulkan(VulkanContext* context);
 
 // vulkan_swapchain.c 
-VulkanSwapchain createSwapchain(VulkanContext* context, VkSurfaceKHR surface, VkImageUsageFlags usage);
+VulkanSwapchain createSwapchain(VulkanContext* context, VkSurfaceKHR surface, VkImageUsageFlags usage, VulkanSwapchain* oldSwapchain);
 void destroySwapchain(VulkanContext* context, VulkanSwapchain* swapchain);
 
 // vulkan_renderpass.c 
