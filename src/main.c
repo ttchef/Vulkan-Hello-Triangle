@@ -28,10 +28,22 @@ VkFence fences[FRAMES_IN_FLIGHT];
 VulkanPipeline pipeline;
 VkSemaphore acrquireSemaphores[FRAMES_IN_FLIGHT];
 VkSemaphore releaseSemaphores[FRAMES_IN_FLIGHT];
+VulkanBuffer vertexBuffer;
 
 uint32_t frameIndex = 0;
 
 bool framebufferResized = false;
+
+float vertexData[] = {
+    0.0f, -0.5f,
+    1.0f, 0.0f, 0.0f,
+
+    0.5f, 0.5f,
+    0.0f, 1.0f, 0.0f,
+
+    -0.5f, 0.5f,
+    0.0f, 0.0f, 1.0f
+};
 
 void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
     framebufferResized = true;
@@ -84,7 +96,25 @@ void initApplication(GLFWwindow* window) {
         }
     }   
 
-    pipeline = createPipeline(context, "shaders/triangle_vert.spv", "shaders/triangle_frag.spv", renderPass, swapchain.width, swapchain.height);
+    VkVertexInputAttributeDescription vertexAttributeDescriptions[2] = {0};
+    vertexAttributeDescriptions[0].binding = 0;
+    vertexAttributeDescriptions[0].location = 0;
+    vertexAttributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+    vertexAttributeDescriptions[0].offset = 0;
+
+    vertexAttributeDescriptions[1].binding = 0;
+    vertexAttributeDescriptions[1].location = 1;
+    vertexAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    vertexAttributeDescriptions[1].offset = sizeof(float) * 2;
+
+    VkVertexInputBindingDescription vertexInputBinding = {0};
+    vertexInputBinding.binding = 0;
+    vertexInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    vertexInputBinding.stride = sizeof(float) * 5;
+
+    pipeline = createPipeline(context, "shaders/color_vert.spv", "shaders/color_frag.spv", renderPass, swapchain.width,
+            swapchain.height, vertexAttributeDescriptions, ARRAY_COUNT(vertexAttributeDescriptions),
+            &vertexInputBinding);
 
     for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++){
         VkFenceCreateInfo createInfo = {0};
@@ -135,6 +165,19 @@ void initApplication(GLFWwindow* window) {
             return;
         }
     }
+
+    createBuffer(context, &vertexBuffer, sizeof(vertexData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+    void* data;
+    if (vkMapMemory(context->device, vertexBuffer.memory, 0, sizeof(vertexData), 0, &data) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to map memory for vertex buffer!\n");
+        return;
+    }
+
+    // Vulkan is crazy!
+    memcpy(data, vertexData, sizeof(vertexData));
+
+    vkUnmapMemory(context->device, vertexBuffer.memory);
 }
 
 void recreateRenderPass() {
@@ -201,9 +244,9 @@ void renderApplication() {
     // getting image from swapchain
     VkResult result = vkAcquireNextImageKHR(context->device, swapchain.swapchain, UINT64_MAX, acrquireSemaphores[frameIndex], 0, &imageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
+        fprintf(stderr, "Resize!\n");
         framebufferResized = false;
         recreateSwapchain();
-        fprintf(stderr, "Resize!\n");
         return;
     }
     else if (result != VK_SUCCESS) {
@@ -259,6 +302,8 @@ void renderApplication() {
         VkRect2D scissor = (VkRect2D){{0, 0}, {swapchain.width, swapchain.height}};
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
     
+        VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.buffer, &offset);
 
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
@@ -295,9 +340,9 @@ void renderApplication() {
 
     result = vkQueuePresentKHR(context->graphicsQueue.queue, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
+        fprintf(stderr, "Resize!\n");
         framebufferResized = false;
         recreateSwapchain();
-        fprintf(stderr, "Resize!\n");
     }
     else if (result != VK_SUCCESS) {
         fprintf(stderr, "Failed to acrquire next image from swapchain!\n");
@@ -309,6 +354,8 @@ void renderApplication() {
 
 void shutdownApplication() {
     vkDeviceWaitIdle(context->device);
+
+    destroyBuffer(context, &vertexBuffer);
 
     for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         vkDestroyFence(context->device, fences[i], NULL);

@@ -32,6 +32,11 @@ typedef struct {
 } VulkanPipeline;
 
 typedef struct {
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+} VulkanBuffer;
+
+typedef struct {
     VkInstance instance;
     VkPhysicalDevice physicalDevice;
     VkPhysicalDeviceProperties physicalDeviceProperties;
@@ -59,8 +64,16 @@ void destroyRenderPass(VulkanContext* context, VkRenderPass renderPass);
 // vulkan_pipeline.c 
 VkShaderModule createShaderModule(VulkanContext* context, const char* filepath);
 VulkanPipeline createPipeline(VulkanContext* context, const char* vertPath, const char* fragPath,
-        VkRenderPass renderPass, uint32_t width, uint32_t height);
+        VkRenderPass renderPass, uint32_t width, uint32_t height,
+        VkVertexInputAttributeDescription* attributes, uint32_t numAttributes,
+        VkVertexInputBindingDescription* binding);
 void destroyPipeline(VulkanContext* context, VulkanPipeline* pipeline);
+
+// vulkan_utils.c 
+void createBuffer(VulkanContext* context, VulkanBuffer* buffer, uint64_t size,
+        VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties);
+void destroyBuffer(VulkanContext* context, VulkanBuffer* buffer);
+uint32_t findMemoryType(VulkanContext* context, uint32_t typeFilter, VkMemoryPropertyFlags memoryProperties);
 
 #endif // VULKAN_BASE_H
       

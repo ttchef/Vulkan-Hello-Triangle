@@ -51,7 +51,9 @@ VkShaderModule createShaderModule(VulkanContext *context, const char *filepath) 
 }
 
 VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, const char *fragPath,
-        VkRenderPass renderPass, uint32_t width, uint32_t height) {
+        VkRenderPass renderPass, uint32_t width, uint32_t height,
+        VkVertexInputAttributeDescription* attributes, uint32_t numAttributes,
+        VkVertexInputBindingDescription* binding) {
 
     VkShaderModule vertexShaderModule = createShaderModule(context, vertPath);
     VkShaderModule fragmentShaderModule = createShaderModule(context, fragPath);
@@ -71,6 +73,11 @@ VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, cons
 
     VkPipelineVertexInputStateCreateInfo vertexInputState = {0};
     vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+    vertexInputState.vertexAttributeDescriptionCount = numAttributes;
+    vertexInputState.pVertexAttributeDescriptions = attributes;
+    vertexInputState.vertexBindingDescriptionCount = binding ? 1 : 0;
+    vertexInputState.pVertexBindingDescriptions = binding;
 
     VkPipelineInputAssemblyStateCreateInfo inpuAssemblyState = {0};
     inpuAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
