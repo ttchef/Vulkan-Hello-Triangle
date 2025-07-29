@@ -237,6 +237,14 @@ void exitVulkan(VulkanContext *context) {
     // wait for graphics crad to finish work
     vkDeviceWaitIdle(context->device);
     vkDestroyDevice(context->device, NULL);
+    
+    if (context->debugCallback) {
+        
+        PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT;
+        vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(context->instance, "vkDestroyDebugUtilsMessengerEXT");
+        vkDestroyDebugUtilsMessengerEXT(context->instance, context->debugCallback, NULL);
+    }
+
     vkDestroyInstance(context->instance, NULL);
 }
 
