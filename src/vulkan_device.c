@@ -5,7 +5,50 @@
 #include "../include/vulkan_base.h"
 
 #include <darray/darray.h>
+#include <vulkan/vk_platform.h>
 #include <vulkan/vulkan_core.h>
+
+VkBool32 VKAPI_CALL debugReportCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT                  messageTypes,
+    const VkDebugUtilsMessengerCallbackDataEXT*      pCallbackData,
+    void*                                            pUserData) {
+    
+    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+        fprintf(stderr, "Error: ");
+    }
+    else {
+        fprintf(stderr, "Warning: ");
+    }
+
+    fprintf(stderr, "%s\n\n", pCallbackData->pMessage);
+
+    return VK_FALSE;
+}
+
+VkDebugUtilsMessengerEXT registerDebugCallback(VkInstance instance) {
+    PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT;
+    vkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+
+    VkDebugUtilsMessengerEXT callback = 0;
+
+    VkDebugUtilsMessengerCreateInfoEXT callbackInfo = {0};
+    callbackInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    callbackInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                                    VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
+
+    callbackInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+                                VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+    callbackInfo.pfnUserCallback = debugReportCallback;
+
+    if (vkCreateDebugUtilsMessengerEXT(instance, &callbackInfo, NULL, &callback) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to create debug messenger from extension!\n");
+        return 0;
+    }
+
+    return callback;
+}
 
 bool createLogicalDevice(VulkanContext *context, uint32_t deviceExtensionCount, const char** deviceExtensions) {
     
@@ -102,7 +145,7 @@ bool selectPhysicalDevice(VulkanContext *context) {
     return true;
 }
 
-bool initVulkanInstance(VulkanContext* context, uint32_t glfwExtensionCount, const char** glfwExtensions) {
+bool initVulkanInstance(VulkanContext* context, uint32_t instanceExtensionCount, const char** instanceExtensions) {
 
     // get layers
     uint32_t layerCount = 0;
@@ -136,27 +179,41 @@ bool initVulkanInstance(VulkanContext* context, uint32_t glfwExtensionCount, con
     
     free(layerProperties);
 
+    VkValidationFeatureEnableEXT enabledValidationFeatrues[] = {
+        VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
+        VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+        VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
+    };
+
+    VkValidationFeaturesEXT validationFeatures = {0};
+    validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+    validationFeatures.enabledValidationFeatureCount = ARRAY_COUNT(enabledValidationFeatrues);
+    validationFeatures.pEnabledValidationFeatures = enabledValidationFeatrues;
+
     VkApplicationInfo appInfo = {0};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Mef";
     appInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
     appInfo.pEngineName = "Mef_Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_2;
+    appInfo.apiVersion = VK_API_VERSION_1_0;
 
     VkInstanceCreateInfo createInfo = {0};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    createInfo.pNext = &validationFeatures;
     createInfo.pApplicationInfo = &appInfo;
 
     createInfo.enabledLayerCount = ARRAY_COUNT(enabledLayers);
     createInfo.ppEnabledLayerNames = enabledLayers;
-    createInfo.enabledExtensionCount = glfwExtensionCount;
-    createInfo.ppEnabledExtensionNames = glfwExtensions;
+    createInfo.enabledExtensionCount = instanceExtensionCount;
+    createInfo.ppEnabledExtensionNames = instanceExtensions;
 
     if (vkCreateInstance(&createInfo, NULL, &context->instance) != VK_SUCCESS) {
         fprintf(stderr, "Failed to create vulkan instance!\n");
         return false;
     }
+
+    context->debugCallback = registerDebugCallback(context->instance);
 
     return true;
 }

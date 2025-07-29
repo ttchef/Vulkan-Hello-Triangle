@@ -42,6 +42,7 @@ typedef struct {
     VkPhysicalDeviceProperties physicalDeviceProperties;
     VkDevice device;
     VulkanQueue graphicsQueue;
+    VkDebugUtilsMessengerEXT debugCallback;
 } VulkanContext;
 
 VulkanContext* initVulkan(uint32_t glfwExtensionCount, const char** glfwExtensions,
@@ -52,6 +53,7 @@ bool initVulkanInstance(VulkanContext* context, uint32_t glfwExtensionCount, con
 bool selectPhysicalDevice(VulkanContext* context);
 bool createLogicalDevice(VulkanContext* context, uint32_t deviceExtensionCount, const char** deviceExtensions);
 void exitVulkan(VulkanContext* context);
+VkDebugUtilsMessengerEXT registerDebugCallback(VkInstance instance);
 
 // vulkan_swapchain.c 
 VulkanSwapchain createSwapchain(VulkanContext* context, VkSurfaceKHR surface, VkImageUsageFlags usage, VulkanSwapchain* oldSwapchain);

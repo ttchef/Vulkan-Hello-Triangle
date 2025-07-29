@@ -64,15 +64,39 @@ void initApplication(GLFWwindow* window) {
 
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
+    const char* additionalInstanceExtensions[] = {
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+        VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME
+    };
+
+    uint32_t totalInstanceExtensionCount = glfwExtensionCount + ARRAY_COUNT(additionalInstanceExtensions);
+    const char** enabledInstanceExtensions = malloc(sizeof(char*) * totalInstanceExtensionCount);
+    if (!enabledInstanceExtensions) {
+        fprintf(stderr, "Failed to allocate memory for enabledInstanceExtensions!\n");
+        return;
+    }
+
+    // copy glfw
+    for (uint32_t i = 0; i < glfwExtensionCount; i++) {
+        enabledInstanceExtensions[i] = glfwExtensions[i];
+    }
+
+    // copy additional
+    for (uint32_t i = 0; i < ARRAY_COUNT(additionalInstanceExtensions); i++) {
+        enabledInstanceExtensions[glfwExtensionCount + i] = additionalInstanceExtensions[i];
+    }
+
     const char* enabledDeviceExtensions[] = {
         "VK_KHR_swapchain"
     };
 
-    context = initVulkan(glfwExtensionCount, glfwExtensions, ARRAY_COUNT(enabledDeviceExtensions), enabledDeviceExtensions);
+    context = initVulkan(totalInstanceExtensionCount, enabledInstanceExtensions, ARRAY_COUNT(enabledDeviceExtensions), enabledDeviceExtensions);
     if (!context) {
         fprintf(stderr, "Failed to create vulkan context!\n");
         return;
     }
+    free(enabledInstanceExtensions);
+    enabledInstanceExtensions = NULL;
 
     surface = VK_NULL_HANDLE;
     if (glfwCreateWindowSurface(context->instance, window, NULL, &surface) != VK_SUCCESS) {
