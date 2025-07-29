@@ -1,8 +1,96 @@
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include <vulkan/vulkan_core.h>
 
 #include "../include/vulkan_base.h"
+
+void uploadDataToBuffer(VulkanContext *context, VulkanBuffer *buffer, void *data, size_t size) {
+#if 0
+    void* mapped;  
+    if (vkMapMemory(context->device, buffer->memory, 0, size, 0, &mapped) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to map memory for vulkan buffer!\n");
+        return;
+    }
+    memcpy(mapped, data, size);
+    vkUnmapMemory(context->device, buffer->memory);
+
+#else 
+    VulkanQueue* queue = &context->graphicsQueue;
+    VkCommandPool commandPool;
+    VkCommandBuffer commandBuffer;
+    VulkanBuffer stagingBuffer;
+
+    createBuffer(context, &stagingBuffer, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    void* mapped;
+    if (vkMapMemory(context->device, stagingBuffer.memory, 0, size, 0, &mapped) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to map memory for vulkan buffer!\n");
+        return;
+    }
+    memcpy(mapped, data, size);
+    vkUnmapMemory(context->device, stagingBuffer.memory);
+
+    {
+        VkCommandPoolCreateInfo createInfo = {0};
+        createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        createInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        createInfo.queueFamilyIndex = queue->familyIndex;
+        if (vkCreateCommandPool(context->device, &createInfo, NULL, &commandPool) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to create commandPool for staging buffer!\n");
+            return;
+        }
+    }
+    {
+        VkCommandBufferAllocateInfo allocInfo = {0};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = 1;
+        allocInfo.commandPool = commandPool;
+        if (vkAllocateCommandBuffers(context->device, &allocInfo, &commandBuffer) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to allocate command buffer for staging buffer!\n");
+            return;
+        }
+    }
+
+    VkCommandBufferBeginInfo beginInfo = {0};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to beging command buffer for staging buffer!\n");
+        return;
+    }
+
+    VkBufferCopy region = (VkBufferCopy){ 0, 0, size };
+    vkCmdCopyBuffer(commandBuffer, stagingBuffer.buffer, buffer->buffer, 1, &region);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to end command buffer for staging buffer!\n");
+        return;
+    }
+
+    VkSubmitInfo subInfo = {0};
+    subInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    subInfo.commandBufferCount = 1;
+    subInfo.pCommandBuffers = &commandBuffer;
+
+    if (vkQueueSubmit(queue->queue, 1, &subInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to submit queue for staging buffer!\n");
+        return;
+    }
+
+    if (vkQueueWaitIdle(queue->queue) != VK_SUCCESS) {
+        fprintf(stderr, "Failed to wait for queue in staging buffer!\n");
+        return;
+    }
+
+    vkDestroyCommandPool(context->device, commandPool, NULL);
+    destroyBuffer(context, &stagingBuffer);
+
+#endif
+}
 
 uint32_t findMemoryType(VulkanContext* context, uint32_t typeFilter, VkMemoryPropertyFlags memoryProperties) {
     VkPhysicalDeviceMemoryProperties deviceMemoryProperties;

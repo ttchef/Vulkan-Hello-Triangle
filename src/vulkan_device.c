@@ -52,6 +52,17 @@ bool createLogicalDevice(VulkanContext *context, uint32_t deviceExtensionCount, 
     context->graphicsQueue.familyIndex = graphicsQueueIndex;
     vkGetDeviceQueue(context->device, graphicsQueueIndex, 0, &context->graphicsQueue.queue);
 
+    VkPhysicalDeviceMemoryProperties deviceMemoryProperties = {0};
+    vkGetPhysicalDeviceMemoryProperties(context->physicalDevice, &deviceMemoryProperties);
+    printf("Device memory heaps count: %d\n", deviceMemoryProperties.memoryHeapCount);
+    for (uint32_t i = 0; i < deviceMemoryProperties.memoryHeapCount; i++) {
+        const char* isDeviceLocal = "false";
+        if (deviceMemoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
+            isDeviceLocal = "true";
+        }
+        printf("Heap %d: Size (bytes): %ld Device local: %s\n", i, deviceMemoryProperties.memoryHeaps[i].size, isDeviceLocal);
+    }
+
     return true;
 }
 

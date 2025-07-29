@@ -74,6 +74,7 @@ void createBuffer(VulkanContext* context, VulkanBuffer* buffer, uint64_t size,
         VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties);
 void destroyBuffer(VulkanContext* context, VulkanBuffer* buffer);
 uint32_t findMemoryType(VulkanContext* context, uint32_t typeFilter, VkMemoryPropertyFlags memoryProperties);
+void uploadDataToBuffer(VulkanContext* context, VulkanBuffer* buffer, void* data, size_t size);
 
 #endif // VULKAN_BASE_H
       
