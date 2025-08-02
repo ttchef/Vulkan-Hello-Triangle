@@ -35,22 +35,30 @@ VulkanBuffer vertexBuffer;
 VulkanBuffer indexBuffer;
 VulkanImage image;
 
-uint32_t frameIndex = 0;
+VkSampler sampler;
+VkDescriptorPool descriptorPool;
+VkDescriptorSet descriptorSet;
+VkDescriptorSetLayout descriptorLayout;
 
+uint32_t frameIndex = 0;
 bool framebufferResized = false;
 
 float vertexData[] = {
-    0.5f, -0.5f,
-    1.0f, 0.0f, 0.0f,
+    0.5f, -0.5f,        // Pos
+    1.0f, 0.0f, 0.0f,   // Color
+    1.0f, 0.0f,         // UV
 
     0.5f, 0.5f,
     0.0f, 1.0f, 0.0f,
+    1.0f, 1.0f,
 
     -0.5f, 0.5f,
     0.0f, 0.0f, 1.0f, 
+    0.0f, 1.0f,
 
     -0.5f, -0.5f, 
-    0.0f, 1.0f, 0.0f
+    0.0f, 1.0f, 0.0f,
+    0.0f, 0.0f
 };
 
 uint32_t indexData[] = {
@@ -129,11 +137,109 @@ void initApplication(GLFWwindow* window) {
 
         if (vkCreateFramebuffer(context->device, &createInfo, NULL, &framebuffers[i]) != VK_SUCCESS) {
             fprintf(stderr, "Failed to create vulkan framebuffers!\n");
-            return;
+            exit(-1);
         }
     }   
 
-    VkVertexInputAttributeDescription vertexAttributeDescriptions[2] = {0};
+    {
+        VkSamplerCreateInfo createInfo = {0};
+        createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        createInfo.magFilter = VK_FILTER_NEAREST;
+        createInfo.minFilter = VK_FILTER_NEAREST;
+        createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        createInfo.addressModeV = createInfo.addressModeU;
+        createInfo.addressModeW = createInfo.addressModeU;
+        createInfo.mipLodBias = 0.0f;
+        createInfo.maxAnisotropy = 1.0f;
+        createInfo.minLod = 0.0f;
+        createInfo.maxLod = 1.0f;
+
+        if (vkCreateSampler(context->device, &createInfo, NULL, &sampler) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to create sampler!\n");
+            exit(-1);
+        }
+    }
+
+    {
+
+        const char* path = "/home/ttchef/coding/c/Vulkan-Hello-Triangle/res/images/forest.png";
+        int width, height, channels;
+        uint8_t* data = stbi_load(path, &width, &height, &channels, 4);
+        if (!data) {
+            fprintf(stderr, "Failed to load image data: %s\n", path);
+            exit(-1);
+        }
+
+        createImage(context, &image, width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+        uploadDataToImage(context, &image, data, width * height * 4,
+                          width, height, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+        stbi_image_free(data);
+    }
+
+    {
+
+        VkDescriptorPoolSize poolSizes[] = {
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
+        };
+
+        VkDescriptorPoolCreateInfo createInfo = {0};
+        createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        createInfo.maxSets = 1;
+        createInfo.poolSizeCount = ARRAY_COUNT(poolSizes);
+        createInfo.pPoolSizes = poolSizes;
+
+        if (vkCreateDescriptorPool(context->device, &createInfo, NULL, &descriptorPool) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to create descriptorPool!\n");
+            exit(-1);
+        }
+    }
+
+    {
+        VkDescriptorSetLayoutBinding bindings[] = {
+            { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, 0 },
+        };
+
+
+        VkDescriptorSetLayoutCreateInfo createInfo = {0};
+        createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        createInfo.bindingCount = ARRAY_COUNT(bindings);
+        createInfo.pBindings = bindings;
+
+        if (vkCreateDescriptorSetLayout(context->device, &createInfo, NULL, &descriptorLayout) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to create descriptor layout!\n");
+            exit(-1);
+        }
+
+        VkDescriptorSetAllocateInfo allocInfo = {0};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &descriptorLayout;
+
+        if (vkAllocateDescriptorSets(context->device, &allocInfo, &descriptorSet) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to allocate descriptor set!\n");
+            exit(-1);
+        }
+
+        VkDescriptorImageInfo imageInfo = {0};
+        imageInfo.sampler = sampler;
+        imageInfo.imageView = image.view;
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkWriteDescriptorSet descriptorWrites[1];
+        descriptorWrites[0] = (VkWriteDescriptorSet){0};
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = descriptorSet;
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[0].pImageInfo = &imageInfo;
+
+        vkUpdateDescriptorSets(context->device, ARRAY_COUNT(descriptorWrites), descriptorWrites, 0, NULL);
+    }
+
+    VkVertexInputAttributeDescription vertexAttributeDescriptions[3] = {0};
     vertexAttributeDescriptions[0].binding = 0;
     vertexAttributeDescriptions[0].location = 0;
     vertexAttributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
@@ -144,14 +250,19 @@ void initApplication(GLFWwindow* window) {
     vertexAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
     vertexAttributeDescriptions[1].offset = sizeof(float) * 2;
 
+    vertexAttributeDescriptions[2].binding = 0;
+    vertexAttributeDescriptions[2].location = 2;
+    vertexAttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+    vertexAttributeDescriptions[2].offset = sizeof(float) * 5;
+
     VkVertexInputBindingDescription vertexInputBinding = {0};
     vertexInputBinding.binding = 0;
     vertexInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    vertexInputBinding.stride = sizeof(float) * 5;
+    vertexInputBinding.stride = sizeof(float) * 7;
 
 
 
-    pipeline = createPipeline(context, "shaders/color_vert.spv", "shaders/color_frag.spv", renderPass, swapchain.width,
+    pipeline = createPipeline(context, "shaders/texture_vert.spv", "shaders/texture_frag.spv", renderPass, swapchain.width,
             swapchain.height, vertexAttributeDescriptions, ARRAY_COUNT(vertexAttributeDescriptions),
             &vertexInputBinding);
 
@@ -214,21 +325,7 @@ void initApplication(GLFWwindow* window) {
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     uploadDataToBuffer(context, &indexBuffer, indexData, sizeof(indexData));
 
-    {
 
-        const char* path = "/home/ttchef/coding/c/Vulkan-Hello-Triangle/res/images/forest.png";
-        int width, height, channels;
-        uint8_t* data = stbi_load(path, &width, &height, &channels, 4);
-        if (!data) {
-            fprintf(stderr, "Failed to load image data: %s\n", path);
-            exit(-1);
-        }
-
-        createImage(context, &image, width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-        uploadDataToImage(context, &image, data, width * height * 4,
-                          width, height, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-        stbi_image_free(data);
-    }
 }
 
 void recreateRenderPass() {
@@ -424,6 +521,8 @@ void shutdownApplication() {
     }
 
     destroyPipeline(context, &pipeline);
+
+    vkDestroySampler(context->device, sampler, NULL);
 
     for (uint32_t i = 0; i < swapchain.imagesCount; i++) {
         vkDestroyFramebuffer(context->device, framebuffers[i], NULL);
