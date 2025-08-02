@@ -7,6 +7,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "../vendor/stb/stb_image.h"
+
 // own libs
 #include <darray/darray.h>
 #include <drings/drings.h>
@@ -30,6 +33,7 @@ VkSemaphore acrquireSemaphores[FRAMES_IN_FLIGHT];
 VkSemaphore releaseSemaphores[FRAMES_IN_FLIGHT];
 VulkanBuffer vertexBuffer;
 VulkanBuffer indexBuffer;
+VulkanImage image;
 
 uint32_t frameIndex = 0;
 
@@ -209,6 +213,22 @@ void initApplication(GLFWwindow* window) {
     createBuffer(context, &indexBuffer, sizeof(indexData), VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     uploadDataToBuffer(context, &indexBuffer, indexData, sizeof(indexData));
+
+    {
+
+        const char* path = "/home/ttchef/coding/c/Vulkan-Hello-Triangle/res/images/forest.png";
+        int width, height, channels;
+        uint8_t* data = stbi_load(path, &width, &height, &channels, 4);
+        if (!data) {
+            fprintf(stderr, "Failed to load image data: %s\n", path);
+            exit(-1);
+        }
+
+        createImage(context, &image, width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+        uploadDataToImage(context, &image, data, width * height * 4,
+                          width, height, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+        stbi_image_free(data);
+    }
 }
 
 void recreateRenderPass() {
@@ -237,7 +257,6 @@ void recreateRenderPass() {
             return;
         }
     }   
-
 }
 
 void recreateSwapchain() {
@@ -387,6 +406,8 @@ void renderApplication() {
 
 void shutdownApplication() {
     vkDeviceWaitIdle(context->device);
+
+    destroyImage(context, &image);
 
     destroyBuffer(context, &indexBuffer);
     destroyBuffer(context, &vertexBuffer);
