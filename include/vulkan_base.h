@@ -75,7 +75,7 @@ VulkanPipeline createPipeline(VulkanContext* context, const char* vertPath, cons
         VkRenderPass renderPass, uint32_t width, uint32_t height,
         VkVertexInputAttributeDescription* attributes, uint32_t numAttributes,
         VkVertexInputBindingDescription* binding, uint32_t numSetLayouts,
-        VkDescriptorSetLayout* setLayouts);
+        VkDescriptorSetLayout* setLayouts, VkPushConstantRange* pushConstant);
 void destroyPipeline(VulkanContext* context, VulkanPipeline* pipeline);
 
 // vulkan_utils.c 

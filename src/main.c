@@ -10,9 +10,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../vendor/stb/stb_image.h"
 
-// own libs
-#include <darray/darray.h>
-#include <drings/drings.h>
+#include "../vendor/HandmadeMath/HandmadeMath.h"
 
 #include "../include/vulkan_base.h"
 #include "../include/model.h"
@@ -70,6 +68,10 @@ uint32_t indexData[] = {
     0, 1, 2,
     3, 0, 2
 };
+
+static float degToRad(float deg) {
+    return deg * (HMM_PI32 / 180.0f);
+}
 
 void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
     framebufferResized = true;
@@ -266,12 +268,11 @@ void initApplication(GLFWwindow* window) {
     vertexInputBinding.stride = sizeof(float) * 7;
 
 
-
     spritePipeline = createPipeline(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/texture_vert.spv",
                                     "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/texture_frag.spv", renderPass,
                                     swapchain.width, swapchain.height, vertexAttributeDescriptions,
                                     ARRAY_COUNT(vertexAttributeDescriptions), &vertexInputBinding, 1,
-                                    &descriptorLayout);
+                                    &descriptorLayout, NULL);
 
     VkVertexInputAttributeDescription modelAttributeDescriptions[2] = {0};
     modelAttributeDescriptions[0].binding = 0;
@@ -289,11 +290,15 @@ void initApplication(GLFWwindow* window) {
     modelInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     modelInputBinding.stride = sizeof(float) * 6;
 
+    VkPushConstantRange pushConstant = {0};
+    pushConstant.offset = 0;
+    pushConstant.size = sizeof(HMM_Mat4);
+    pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     modelPipeline = createPipeline(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/model_vert.spv",
                                     "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/model_frag.spv", renderPass,
                                    swapchain.width, swapchain.height, modelAttributeDescriptions, 
-                                   ARRAY_COUNT(modelAttributeDescriptions), &modelInputBinding, 0, 0);
+                                   ARRAY_COUNT(modelAttributeDescriptions), &modelInputBinding, 0, 0, &pushConstant);
 
     for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++){
         VkFenceCreateInfo createInfo = {0};
@@ -404,6 +409,18 @@ void recreateSwapchain() {
     recreateRenderPass();
 }
 
+HMM_Mat4 getProjectionInverseZ(float fovy, float width, float height, float zNear) {
+    float f = 1.0f / tanf(fovy / 2.0f);
+    float aspect = width / height;
+    
+    HMM_Mat4 result = {0};
+    result.Elements[0][0] = f / aspect;
+    result.Elements[1][1] = -f;
+    result.Elements[2][3] = 1.0f;
+    result.Elements[3][2] = zNear;
+    return result;
+}
+
 void renderApplication() {
 
     static float greenChannel = 0.0f;
@@ -486,11 +503,23 @@ void renderApplication() {
 
         vkCmdDrawIndexed(commandBuffer, ARRAY_COUNT(indexData), 1, 0, 0, 0);
 #else 
+        HMM_Mat4 translationMatrix = HMM_Translate(HMM_V3(0.0f, 0.f, 3.0f));
+        HMM_Mat4 scaleMatrix = HMM_Scale(HMM_V3(1.0f, 1.0f, 1.0f));
+        HMM_Mat4 rotatationMatrix = HMM_Rotate_RH(greenChannel * 10.0f, HMM_V3(0.0f, 1.0f, 0.0f));
+
+        HMM_Mat4 tempModel = HMM_MulM4(translationMatrix, scaleMatrix);
+        HMM_Mat4 modelMatrix = HMM_MulM4(tempModel, rotatationMatrix);
+
+        HMM_Mat4 projMatrix = getProjectionInverseZ(degToRad(80.0f), swapchain.width, swapchain.height, 0.01);
+
+        HMM_Mat4 modelViewProj = HMM_MulM4(projMatrix, modelMatrix);
+
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline.pipeline);
 
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model.vertexBuffer.buffer, &offset);
         vkCmdBindIndexBuffer(commandBuffer, model.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdPushConstants(commandBuffer, modelPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(modelViewProj), &modelViewProj);
         vkCmdDrawIndexed(commandBuffer, model.numIndices, 1, 0, 0, 0);
 
 #endif

@@ -53,7 +53,8 @@ VkShaderModule createShaderModule(VulkanContext *context, const char *filepath) 
 VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, const char *fragPath,
         VkRenderPass renderPass, uint32_t width, uint32_t height,
         VkVertexInputAttributeDescription* attributes, uint32_t numAttributes,
-        VkVertexInputBindingDescription* binding, uint32_t numSetLayouts, VkDescriptorSetLayout* setLayouts) {
+        VkVertexInputBindingDescription* binding, uint32_t numSetLayouts,
+        VkDescriptorSetLayout* setLayouts, VkPushConstantRange* pushConstant) {
 
     VkShaderModule vertexShaderModule = createShaderModule(context, vertPath);
     VkShaderModule fragmentShaderModule = createShaderModule(context, fragPath);
@@ -131,6 +132,8 @@ VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, cons
         createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         createInfo.setLayoutCount = numSetLayouts;
         createInfo.pSetLayouts = setLayouts;
+        createInfo.pushConstantRangeCount = pushConstant ? 1 : 0;
+        createInfo.pPushConstantRanges = pushConstant;
 
         if (vkCreatePipelineLayout(context->device, &createInfo, NULL, &pipelineLayout) != VK_SUCCESS) {
             fprintf(stderr, "Failed to create pipelineLayout!\n");
