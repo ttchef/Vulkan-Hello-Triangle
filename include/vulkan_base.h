@@ -37,6 +37,12 @@ typedef struct {
 } VulkanBuffer;
 
 typedef struct {
+    VkImage image;
+    VkImageView view;
+    VkDeviceMemory memory;
+} VulkanImage;
+
+typedef struct {
     VkInstance instance;
     VkPhysicalDevice physicalDevice;
     VkPhysicalDeviceProperties physicalDeviceProperties;
@@ -68,7 +74,8 @@ VkShaderModule createShaderModule(VulkanContext* context, const char* filepath);
 VulkanPipeline createPipeline(VulkanContext* context, const char* vertPath, const char* fragPath,
         VkRenderPass renderPass, uint32_t width, uint32_t height,
         VkVertexInputAttributeDescription* attributes, uint32_t numAttributes,
-        VkVertexInputBindingDescription* binding);
+        VkVertexInputBindingDescription* binding, uint32_t numSetLayouts,
+        VkDescriptorSetLayout* setLayouts);
 void destroyPipeline(VulkanContext* context, VulkanPipeline* pipeline);
 
 // vulkan_utils.c 
@@ -77,6 +84,12 @@ void createBuffer(VulkanContext* context, VulkanBuffer* buffer, uint64_t size,
 void destroyBuffer(VulkanContext* context, VulkanBuffer* buffer);
 uint32_t findMemoryType(VulkanContext* context, uint32_t typeFilter, VkMemoryPropertyFlags memoryProperties);
 void uploadDataToBuffer(VulkanContext* context, VulkanBuffer* buffer, void* data, size_t size);
+void createImage(VulkanContext* context, VulkanImage* image, uint32_t width, uint32_t height,
+                 VkFormat format, VkImageUsageFlags usage);
+void destroyImage(VulkanContext* context, VulkanImage* image);
+void uploadDataToImage(VulkanContext* context, VulkanImage* image, void* data,
+                       uint32_t size, uint32_t width, uint32_t height,
+                       VkImageLayout finalLayout, VkAccessFlags dstAccessMask);
 
 #endif // VULKAN_BASE_H
       

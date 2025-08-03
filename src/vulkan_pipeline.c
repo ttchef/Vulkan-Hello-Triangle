@@ -53,7 +53,7 @@ VkShaderModule createShaderModule(VulkanContext *context, const char *filepath) 
 VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, const char *fragPath,
         VkRenderPass renderPass, uint32_t width, uint32_t height,
         VkVertexInputAttributeDescription* attributes, uint32_t numAttributes,
-        VkVertexInputBindingDescription* binding) {
+        VkVertexInputBindingDescription* binding, uint32_t numSetLayouts, VkDescriptorSetLayout* setLayouts) {
 
     VkShaderModule vertexShaderModule = createShaderModule(context, vertPath);
     VkShaderModule fragmentShaderModule = createShaderModule(context, fragPath);
@@ -105,7 +105,13 @@ VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, cons
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {0};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
+    colorBlendAttachment.blendEnable = VK_TRUE;
+    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
     VkPipelineColorBlendStateCreateInfo colorBlendState = {0};
     colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -123,6 +129,8 @@ VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, cons
     {
         VkPipelineLayoutCreateInfo createInfo = {0};
         createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        createInfo.setLayoutCount = numSetLayouts;
+        createInfo.pSetLayouts = setLayouts;
 
         if (vkCreatePipelineLayout(context->device, &createInfo, NULL, &pipelineLayout) != VK_SUCCESS) {
             fprintf(stderr, "Failed to create pipelineLayout!\n");
