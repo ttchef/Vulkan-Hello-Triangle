@@ -163,7 +163,7 @@ void initApplication(GLFWwindow* window) {
 
     {
 
-        const char* path = "/home/ttchef/coding/c/Vulkan-Hello-Triangle/res/images/forest.png";
+        const char* path = "/home/ttchef/coding/c/Vulkan-Hello-Triangle/res/images/arch.png";
         int width, height, channels;
         uint8_t* data = stbi_load(path, &width, &height, &channels, 4);
         if (!data) {
@@ -171,7 +171,7 @@ void initApplication(GLFWwindow* window) {
             exit(-1);
         }
 
-        createImage(context, &image, width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+        createImage(context, &image, width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
         uploadDataToImage(context, &image, data, width * height * 4,
                           width, height, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
         stbi_image_free(data);
@@ -262,9 +262,9 @@ void initApplication(GLFWwindow* window) {
 
 
 
-    pipeline = createPipeline(context, "shaders/texture_vert.spv", "shaders/texture_frag.spv", renderPass, swapchain.width,
+    pipeline = createPipeline(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/texture_vert.spv", "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/texture_frag.spv", renderPass, swapchain.width,
             swapchain.height, vertexAttributeDescriptions, ARRAY_COUNT(vertexAttributeDescriptions),
-            &vertexInputBinding);
+            &vertexInputBinding, 1, &descriptorLayout);
 
     for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++){
         VkFenceCreateInfo createInfo = {0};
@@ -451,8 +451,8 @@ void renderApplication() {
     
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.buffer, &offset);
-
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1, &descriptorSet, 0, 0);
 
         vkCmdDrawIndexed(commandBuffer, ARRAY_COUNT(indexData), 1, 0, 0, 0);
 
@@ -503,6 +503,9 @@ void renderApplication() {
 
 void shutdownApplication() {
     vkDeviceWaitIdle(context->device);
+
+    vkDestroyDescriptorPool(context->device, descriptorPool, NULL);
+    vkDestroyDescriptorSetLayout(context->device, descriptorLayout, NULL);
 
     destroyImage(context, &image);
 

@@ -286,15 +286,22 @@ void uploadDataToImage(VulkanContext *context, VulkanImage *image, void* data,
         imageBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
         vkCmdPipelineBarrier(
-            commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 
             0, 0, 0, 0, 0, 1, &imageBarrier
         );
     }
 
+    VkBufferImageCopy region = {0};
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.layerCount = 1;
+    region.imageExtent = (VkExtent3D){ width, height, 1};
+
+    vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
     {
         VkImageMemoryBarrier imageBarrier = {0};
         imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        imageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         imageBarrier.newLayout = finalLayout;
         imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -310,15 +317,6 @@ void uploadDataToImage(VulkanContext *context, VulkanImage *image, void* data,
             0, 0, 0, 0, 0, 1, &imageBarrier
         );
     }
-
-
-    VkBufferImageCopy region = {0};
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.layerCount = 1;
-    region.imageExtent = (VkExtent3D){ width, height, 1};
-
-    vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         fprintf(stderr, "Failed to end command buffer for staging buffer!\n");

@@ -74,7 +74,8 @@ VkShaderModule createShaderModule(VulkanContext* context, const char* filepath);
 VulkanPipeline createPipeline(VulkanContext* context, const char* vertPath, const char* fragPath,
         VkRenderPass renderPass, uint32_t width, uint32_t height,
         VkVertexInputAttributeDescription* attributes, uint32_t numAttributes,
-        VkVertexInputBindingDescription* binding);
+        VkVertexInputBindingDescription* binding, uint32_t numSetLayouts,
+        VkDescriptorSetLayout* setLayouts);
 void destroyPipeline(VulkanContext* context, VulkanPipeline* pipeline);
 
 // vulkan_utils.c 
