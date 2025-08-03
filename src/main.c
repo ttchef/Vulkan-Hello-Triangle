@@ -273,16 +273,21 @@ void initApplication(GLFWwindow* window) {
                                     ARRAY_COUNT(vertexAttributeDescriptions), &vertexInputBinding, 1,
                                     &descriptorLayout);
 
-    VkVertexInputAttributeDescription modelAttributeDescriptions[1] = {0};
+    VkVertexInputAttributeDescription modelAttributeDescriptions[2] = {0};
     modelAttributeDescriptions[0].binding = 0;
     modelAttributeDescriptions[0].location = 0;
     modelAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
     modelAttributeDescriptions[0].offset = 0;
 
+    modelAttributeDescriptions[1].binding = 0;
+    modelAttributeDescriptions[1].location = 1;
+    modelAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    modelAttributeDescriptions[1].offset = sizeof(float) * 3;
+
     VkVertexInputBindingDescription modelInputBinding = {0};
     modelInputBinding.binding = 0;
     modelInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    modelInputBinding.stride = sizeof(float) * 3;
+    modelInputBinding.stride = sizeof(float) * 6;
 
 
     modelPipeline = createPipeline(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/model_vert.spv",
