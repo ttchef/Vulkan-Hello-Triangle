@@ -198,13 +198,18 @@ void createImage(VulkanContext *context, VulkanImage *image, uint32_t width, uin
         exit(-1);
     }
 
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    if (format == VK_FORMAT_D32_SFLOAT) {
+        aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+    }
+
     {
         VkImageViewCreateInfo createInfo = {0};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         createInfo.image = image->image;
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         createInfo.format = format;
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        createInfo.subresourceRange.aspectMask = aspect;
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.layerCount = 1;
 

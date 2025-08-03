@@ -7,6 +7,9 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
 typedef struct {
@@ -62,7 +65,7 @@ void exitVulkan(VulkanContext* context);
 VkDebugUtilsMessengerEXT registerDebugCallback(VkInstance instance);
 
 // vulkan_swapchain.c 
-VulkanSwapchain createSwapchain(VulkanContext* context, VkSurfaceKHR surface, VkImageUsageFlags usage, VulkanSwapchain* oldSwapchain);
+VulkanSwapchain createSwapchain(GLFWwindow* window, VulkanContext* context, VkSurfaceKHR surface, VkImageUsageFlags usage, VulkanSwapchain* oldSwapchain);
 void destroySwapchain(VulkanContext* context, VulkanSwapchain* swapchain);
 
 // vulkan_renderpass.c 

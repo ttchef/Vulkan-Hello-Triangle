@@ -5,7 +5,10 @@
 
 #include "../include/vulkan_base.h"
 
-VulkanSwapchain createSwapchain(VulkanContext* context, VkSurfaceKHR surface, VkImageUsageFlags usage, VulkanSwapchain* oldSwapchain) {
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+VulkanSwapchain createSwapchain(GLFWwindow* window, VulkanContext* context, VkSurfaceKHR surface, VkImageUsageFlags usage, VulkanSwapchain* oldSwapchain) {
     VulkanSwapchain result = {0};
 
     VkBool32 supportsPresent = 0;
@@ -40,8 +43,11 @@ VulkanSwapchain createSwapchain(VulkanContext* context, VkSurfaceKHR surface, Vk
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->physicalDevice, surface, &surfaceCapabilities);
     if (surfaceCapabilities.currentExtent.width == 0xFFFFFFFF) {
-        surfaceCapabilities.currentExtent.width = surfaceCapabilities.maxImageExtent.width;
-        surfaceCapabilities.currentExtent.height = surfaceCapabilities.maxImageExtent.height;
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+
+        surfaceCapabilities.currentExtent.width = width; // need to be improved for saftey in a decade
+        surfaceCapabilities.currentExtent.height = height;
     }
 
     VkSwapchainCreateInfoKHR createInfo = {0};

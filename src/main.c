@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 #include <time.h>
 #include <vulkan/vulkan_core.h>
 
@@ -26,6 +27,7 @@ VkSurfaceKHR surface;
 VulkanSwapchain swapchain;
 VkRenderPass renderPass;
 VkFramebuffer* framebuffers;
+VulkanImage* depthBuffers;
 VkCommandPool commandPools[FRAMES_IN_FLIGHT];
 VkCommandBuffer commandBuffers[FRAMES_IN_FLIGHT];
 VkFence fences[FRAMES_IN_FLIGHT];
@@ -68,6 +70,8 @@ uint32_t indexData[] = {
     0, 1, 2,
     3, 0, 2
 };
+
+void recreateRenderPass();
 
 static float degToRad(float deg) {
     return deg * (HMM_PI32 / 180.0f);
@@ -123,30 +127,14 @@ void initApplication(GLFWwindow* window) {
         return;
     }
 
-    swapchain = createSwapchain(context, surface, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0);
-
-    renderPass = createRenderPass(context, swapchain.format);
-    framebuffers = malloc(sizeof(VkFramebuffer) * swapchain.imagesCount);
-    if (!framebuffers) {
-        fprintf(stderr, "Failed to allocate memory for framebuffers!\n");
-        return;
+    if (surface == VK_NULL_HANDLE) {
+        fprintf(stderr, "glfwCreateWindowSurface returned VK_SUCCESS but surface is NULL!\n");
+        exit(-1);
     }
 
-    for (uint32_t i = 0; i < swapchain.imagesCount; i++) {
-        VkFramebufferCreateInfo createInfo = {0};
-        createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        createInfo.renderPass = renderPass;
-        createInfo.attachmentCount = 1;
-        createInfo.pAttachments = &swapchain.imageViews[i];
-        createInfo.width = swapchain.width;
-        createInfo.height = swapchain.height;
-        createInfo.layers = 1;
+    swapchain = createSwapchain(window, context, surface, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0);
 
-        if (vkCreateFramebuffer(context->device, &createInfo, NULL, &framebuffers[i]) != VK_SUCCESS) {
-            fprintf(stderr, "Failed to create vulkan framebuffers!\n");
-            exit(-1);
-        }
-    }   
+    recreateRenderPass();
 
     {
         VkSamplerCreateInfo createInfo = {0};
@@ -363,22 +351,58 @@ void initApplication(GLFWwindow* window) {
 }
 
 void recreateRenderPass() {
+    if (!framebuffers) {
+        framebuffers = malloc(sizeof(VkFramebuffer) * swapchain.imagesCount);
+        if (!framebuffers) {
+            fprintf(stderr, "Failed to allocate framebuffers!\n");
+            exit(-1);
+        }
+    }
+
+    if (!depthBuffers) {
+        depthBuffers = malloc(sizeof(VulkanImage) * swapchain.imagesCount);
+        if (!depthBuffers) {
+            fprintf(stderr, "Failed to allocate depthBuffers!\n");
+            exit(-1);
+        }
+    }
+
     if (renderPass) {
         destroyRenderPass(context, renderPass);
 
         for (uint32_t i = 0; i < swapchain.imagesCount; i++) {
             vkDestroyFramebuffer(context->device, framebuffers[i], NULL);
+            destroyImage(context, &depthBuffers[i]);
         }
+    }
+
+    framebuffers = realloc(framebuffers, sizeof(VkFramebuffer) * swapchain.imagesCount);
+    if (!framebuffers) {
+        fprintf(stderr, "Failed to reallocate framebuffers!\n");
+        exit(-1);
+    }
+
+    depthBuffers = realloc(depthBuffers, sizeof(VulkanImage) * swapchain.imagesCount);
+    if (!depthBuffers){
+        fprintf(stderr, "Failed to reallocate depthBuffer!\n");
+        exit(-1);
     }
 
     renderPass = createRenderPass(context, swapchain.format);
 
     for (uint32_t i = 0; i < swapchain.imagesCount; i++) {
+        createImage(context, &depthBuffers[i], swapchain.width, swapchain.height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+        VkImageView attachments[] = {
+            swapchain.imageViews[i],
+            depthBuffers[i].view,
+        };
+
         VkFramebufferCreateInfo createInfo = {0};
         createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         createInfo.renderPass = renderPass;
-        createInfo.attachmentCount = 1;
-        createInfo.pAttachments = &swapchain.imageViews[i];
+        createInfo.attachmentCount = ARRAY_COUNT(attachments);
+        createInfo.pAttachments = attachments;
         createInfo.width = swapchain.width;
         createInfo.height = swapchain.height;
         createInfo.layers = 1;
@@ -402,7 +426,7 @@ void recreateSwapchain() {
     vkDeviceWaitIdle(context->device);
 
     VulkanSwapchain oldSwapchain = swapchain;
-    swapchain = createSwapchain(context, surface, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &oldSwapchain);
+    swapchain = createSwapchain(window, context, surface, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &oldSwapchain);
 
     destroySwapchain(context, &oldSwapchain);
 
@@ -473,8 +497,9 @@ void renderApplication() {
     {
         VkCommandBuffer commandBuffer = commandBuffers[frameIndex];
 
-        VkClearValue clearValue = {
-            .color = { {1.0f, greenChannel, 1.0, 1.0f} }
+        VkClearValue clearValues[2] = {
+            { .color = { {1.0f, greenChannel, 1.0f, 1.0f} } },
+            { .depthStencil = { 0.0f, 0 } }
         };
 
         VkRenderPassBeginInfo beginInfo = {0};
@@ -482,12 +507,12 @@ void renderApplication() {
         beginInfo.renderPass = renderPass;
         beginInfo.framebuffer = framebuffers[imageIndex];
         beginInfo.renderArea = (VkRect2D){ (VkOffset2D){0, 0}, (VkExtent2D){swapchain.width, swapchain.height}};
-        beginInfo.clearValueCount = 1;
-        beginInfo.pClearValues = &clearValue;
+        beginInfo.clearValueCount = ARRAY_COUNT(clearValues);
+        beginInfo.pClearValues = clearValues;
             
         vkCmdBeginRenderPass(commandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        VkViewport viewport = (VkViewport){0.0f, 0.0f, (float)swapchain.width, (float)swapchain.height};
+        VkViewport viewport = (VkViewport){0.0f, 0.0f, (float)swapchain.width, (float)swapchain.height, 0.0f, 1.0f};
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
         VkRect2D scissor = (VkRect2D){{0, 0}, {swapchain.width, swapchain.height}};
@@ -506,6 +531,7 @@ void renderApplication() {
         HMM_Mat4 translationMatrix = HMM_Translate(HMM_V3(0.0f, 0.f, 3.0f));
         HMM_Mat4 scaleMatrix = HMM_Scale(HMM_V3(1.0f, 1.0f, 1.0f));
         HMM_Mat4 rotatationMatrix = HMM_Rotate_RH(greenChannel * 10.0f, HMM_V3(0.0f, 1.0f, 0.0f));
+
 
         HMM_Mat4 tempModel = HMM_MulM4(translationMatrix, scaleMatrix);
         HMM_Mat4 modelMatrix = HMM_MulM4(tempModel, rotatationMatrix);
@@ -599,6 +625,7 @@ void shutdownApplication() {
 
     for (uint32_t i = 0; i < swapchain.imagesCount; i++) {
         vkDestroyFramebuffer(context->device, framebuffers[i], NULL);
+        destroyImage(context, &depthBuffers[i]);
     }
 
     destroyRenderPass(context, renderPass);

@@ -103,6 +103,14 @@ VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, cons
     multisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
+    VkPipelineDepthStencilStateCreateInfo depthStancilState = {0};
+    depthStancilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStancilState.depthTestEnable = VK_TRUE;
+    depthStancilState.depthWriteEnable = VK_TRUE;
+    depthStancilState.depthCompareOp = VK_COMPARE_OP_GREATER;
+    depthStancilState.maxDepthBounds = 0.0f;
+    depthStancilState.maxDepthBounds = 1.0f;
+
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {0};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -153,6 +161,7 @@ VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, cons
         createInfo.pViewportState = &viewportState;
         createInfo.pRasterizationState = &rasterizationState;
         createInfo.pMultisampleState = &multisampleState;
+        createInfo.pDepthStencilState = &depthStancilState;
         createInfo.pColorBlendState = &colorBlendState;
         createInfo.pDynamicState = &dynamicState;
         createInfo.layout = pipelineLayout;
