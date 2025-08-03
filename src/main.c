@@ -15,8 +15,11 @@
 #include <drings/drings.h>
 
 #include "../include/vulkan_base.h"
+#include "../include/model.h"
 
 #define FRAMES_IN_FLIGHT 2
+
+#define USE_MODEL_PIPELINE
 
 GLFWwindow* window;
 
@@ -28,7 +31,8 @@ VkFramebuffer* framebuffers;
 VkCommandPool commandPools[FRAMES_IN_FLIGHT];
 VkCommandBuffer commandBuffers[FRAMES_IN_FLIGHT];
 VkFence fences[FRAMES_IN_FLIGHT];
-VulkanPipeline pipeline;
+VulkanPipeline spritePipeline;
+VulkanPipeline modelPipeline;
 VkSemaphore acrquireSemaphores[FRAMES_IN_FLIGHT];
 VkSemaphore releaseSemaphores[FRAMES_IN_FLIGHT];
 VulkanBuffer vertexBuffer;
@@ -39,6 +43,7 @@ VkSampler sampler;
 VkDescriptorPool descriptorPool;
 VkDescriptorSet descriptorSet;
 VkDescriptorSetLayout descriptorLayout;
+Model model;
 
 uint32_t frameIndex = 0;
 bool framebufferResized = false;
@@ -262,9 +267,28 @@ void initApplication(GLFWwindow* window) {
 
 
 
-    pipeline = createPipeline(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/texture_vert.spv", "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/texture_frag.spv", renderPass, swapchain.width,
-            swapchain.height, vertexAttributeDescriptions, ARRAY_COUNT(vertexAttributeDescriptions),
-            &vertexInputBinding, 1, &descriptorLayout);
+    spritePipeline = createPipeline(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/texture_vert.spv",
+                                    "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/texture_frag.spv", renderPass,
+                                    swapchain.width, swapchain.height, vertexAttributeDescriptions,
+                                    ARRAY_COUNT(vertexAttributeDescriptions), &vertexInputBinding, 1,
+                                    &descriptorLayout);
+
+    VkVertexInputAttributeDescription modelAttributeDescriptions[1] = {0};
+    modelAttributeDescriptions[0].binding = 0;
+    modelAttributeDescriptions[0].location = 0;
+    modelAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    modelAttributeDescriptions[0].offset = 0;
+
+    VkVertexInputBindingDescription modelInputBinding = {0};
+    modelInputBinding.binding = 0;
+    modelInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    modelInputBinding.stride = sizeof(float) * 3;
+
+
+    modelPipeline = createPipeline(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/model_vert.spv",
+                                    "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/model_frag.spv", renderPass,
+                                   swapchain.width, swapchain.height, modelAttributeDescriptions, 
+                                   ARRAY_COUNT(modelAttributeDescriptions), &modelInputBinding, 0, 0);
 
     for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++){
         VkFenceCreateInfo createInfo = {0};
@@ -325,7 +349,7 @@ void initApplication(GLFWwindow* window) {
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     uploadDataToBuffer(context, &indexBuffer, indexData, sizeof(indexData));
 
-
+    model = createModel(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/res/models/monkey.glb");
 }
 
 void recreateRenderPass() {
@@ -441,21 +465,30 @@ void renderApplication() {
             
         vkCmdBeginRenderPass(commandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
-
         VkViewport viewport = (VkViewport){0.0f, 0.0f, (float)swapchain.width, (float)swapchain.height};
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
         VkRect2D scissor = (VkRect2D){{0, 0}, {swapchain.width, swapchain.height}};
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-    
+
+#ifndef USE_MODEL_PIPELINE
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spritePipeline.pipeline);
+
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.buffer, &offset);
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1, &descriptorSet, 0, 0);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spritePipeline.layout, 0, 1, &descriptorSet, 0, 0);
 
         vkCmdDrawIndexed(commandBuffer, ARRAY_COUNT(indexData), 1, 0, 0, 0);
+#else 
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline.pipeline);
 
+        VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model.vertexBuffer.buffer, &offset);
+        vkCmdBindIndexBuffer(commandBuffer, model.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdDrawIndexed(commandBuffer, model.numIndices, 1, 0, 0, 0);
+
+#endif
         vkCmdEndRenderPass(commandBuffer);
     }
 
@@ -509,6 +542,8 @@ void shutdownApplication() {
 
     destroyImage(context, &image);
 
+    destroyModel(context, &model);
+
     destroyBuffer(context, &indexBuffer);
     destroyBuffer(context, &vertexBuffer);
 
@@ -523,7 +558,8 @@ void shutdownApplication() {
         vkDestroyCommandPool(context->device, commandPools[i], NULL);
     }
 
-    destroyPipeline(context, &pipeline);
+    destroyPipeline(context, &spritePipeline);
+    destroyPipeline(context, &modelPipeline);
 
     vkDestroySampler(context->device, sampler, NULL);
 
