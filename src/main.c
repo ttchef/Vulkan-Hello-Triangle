@@ -19,6 +19,8 @@
 #define FRAMES_IN_FLIGHT 2
 
 #define USE_MODEL_PIPELINE
+#define LOG_GPU_TIME
+//#define LOG_CPU_TIME
 
 void recreateRenderPass();
 
@@ -64,6 +66,8 @@ VkDescriptorSetLayout modelDescriptorLayout;
 VkDescriptorPool modelDescriptorPool;
 VkDescriptorSet modelDescriptorSets[FRAMES_IN_FLIGHT];
 VulkanBuffer modelUniformBuffers[FRAMES_IN_FLIGHT];
+
+VkQueryPool timestampQueryPools[FRAMES_IN_FLIGHT];
 
 Camera camera;
 
@@ -338,6 +342,19 @@ void initApplication(GLFWwindow* window) {
 
      }
 
+    // Query Pool 
+    for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        VkQueryPoolCreateInfo createInfo = {0};
+        createInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+        createInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+        createInfo.queryCount = 64; // one minecraft stack
+
+        if (vkCreateQueryPool(context->device, &createInfo, NULL, &timestampQueryPools[i]) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to create query pools!\n");
+            exit(-1);
+        }
+    }
+
     VkVertexInputAttributeDescription vertexAttributeDescriptions[3] = {0};
     vertexAttributeDescriptions[0].binding = 0;
     vertexAttributeDescriptions[0].location = 0;
@@ -561,6 +578,7 @@ HMM_Mat4 getProjectionInverseZ(float fovy, float width, float height, float zNea
 
 void renderApplication() {
 
+    static double frameGpuAvg = 0.0;
     static float greenChannel = 0.0f;
     greenChannel = (sin(glfwGetTime()) + 1) / 2;
     if (greenChannel > 1.0f) greenChannel = 0.0f;
@@ -589,7 +607,19 @@ void renderApplication() {
         return;
     }
 
-
+    // Query timestamps 
+#ifdef LOG_GPU_TIME
+    uint64_t timestamps[2] = {0, 0};
+    VkResult timestampsValid = vkGetQueryPoolResults(context->device, timestampQueryPools[frameIndex], 0, ARRAY_COUNT(timestamps),
+                                                     sizeof(timestamps), timestamps, sizeof(timestamps[0]), VK_QUERY_RESULT_64_BIT);
+    if (timestampsValid == VK_SUCCESS) {
+        double frameGpuBegin = (double)timestamps[0] * context->physicalDeviceProperties.limits.timestampPeriod * 1e-6; // mul with 1e-6 to convert to ms
+        double frameGpuEnd = (double)timestamps[1] * context->physicalDeviceProperties.limits.timestampPeriod * 1e-6;
+        double frameGpuTime = frameGpuEnd - frameGpuBegin;
+        frameGpuAvg = frameGpuAvg * 0.95 + frameGpuTime * 0.05;
+        printf("Gpu Frametime: %lf ms\n", frameGpuAvg);
+    }
+#endif
 
     // reset command pool
     if (vkResetCommandPool(context->device, commandPools[frameIndex], 0) != VK_SUCCESS) {
@@ -609,6 +639,9 @@ void renderApplication() {
     
     {
         VkCommandBuffer commandBuffer = commandBuffers[frameIndex];
+
+        vkCmdResetQueryPool(commandBuffer, timestampQueryPools[frameIndex], 0, 64); // <- minecraft stack
+        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, timestampQueryPools[frameIndex], 0);
 
         VkClearValue clearValues[2] = {
             { .color = { {1.0f, greenChannel, 1.0f, 1.0f} } },
@@ -668,6 +701,8 @@ void renderApplication() {
 
 #endif
         vkCmdEndRenderPass(commandBuffer);
+
+        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, timestampQueryPools[frameIndex], 1);
     }
 
     if (vkEndCommandBuffer(commandBuffers[frameIndex]) != VK_SUCCESS) {
@@ -713,6 +748,11 @@ void renderApplication() {
 
 void shutdownApplication() {
     vkDeviceWaitIdle(context->device);
+
+    // Query Pool 
+    for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        vkDestroyQueryPool(context->device, timestampQueryPools[i], NULL);
+    }
 
     vkDestroyDescriptorPool(context->device, modelDescriptorPool, NULL);
     vkDestroyDescriptorSetLayout(context->device, modelDescriptorLayout, NULL);
@@ -848,6 +888,7 @@ int main() {
 
     double delta = 0.0f;
     double lastTime = glfwGetTime();
+    double frameCpuAvg = 0.0f;
 
     while (!glfwWindowShouldClose(window)) {
         updateApplication(delta);
@@ -857,6 +898,12 @@ int main() {
         double currentTime = glfwGetTime();
         delta = currentTime - lastTime;
         lastTime = currentTime;
+
+#ifdef LOG_CPU_TIME
+        frameCpuAvg = frameCpuAvg * 0.95f + delta * 0.05f * 1000.0f;
+        printf("Frame Time: %lf\n", frameCpuAvg);
+#endif
+
     }
 
     shutdownApplication();
