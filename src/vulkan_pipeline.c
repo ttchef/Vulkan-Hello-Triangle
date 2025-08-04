@@ -107,7 +107,7 @@ VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, cons
     depthStancilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStancilState.depthTestEnable = VK_TRUE;
     depthStancilState.depthWriteEnable = VK_TRUE;
-    depthStancilState.depthCompareOp = VK_COMPARE_OP_GREATER;
+    depthStancilState.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
     depthStancilState.maxDepthBounds = 0.0f;
     depthStancilState.maxDepthBounds = 1.0f;
 

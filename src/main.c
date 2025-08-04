@@ -31,19 +31,24 @@ VulkanImage* depthBuffers;
 VkCommandPool commandPools[FRAMES_IN_FLIGHT];
 VkCommandBuffer commandBuffers[FRAMES_IN_FLIGHT];
 VkFence fences[FRAMES_IN_FLIGHT];
-VulkanPipeline spritePipeline;
-VulkanPipeline modelPipeline;
 VkSemaphore acrquireSemaphores[FRAMES_IN_FLIGHT];
 VkSemaphore releaseSemaphores[FRAMES_IN_FLIGHT];
-VulkanBuffer vertexBuffer;
-VulkanBuffer indexBuffer;
-VulkanImage image;
 
+VulkanBuffer spriteVertexBuffer;
+VulkanBuffer spriteIndexBuffer;
+VulkanImage image;
 VkSampler sampler;
-VkDescriptorPool descriptorPool;
-VkDescriptorSet descriptorSet;
-VkDescriptorSetLayout descriptorLayout;
+VkDescriptorPool spriteDescriptorPool;
+VkDescriptorSet spriteDescriptorSet;
+VkDescriptorSetLayout spriteDescriptorLayout;
+VulkanPipeline spritePipeline;
+
 Model model;
+VulkanPipeline modelPipeline;
+VkDescriptorSetLayout modelDescriptorLayout;
+VkDescriptorPool modelDescriptorPool;
+VkDescriptorSet modelDescriptorSets[FRAMES_IN_FLIGHT];
+VulkanBuffer modelUniformBuffers[FRAMES_IN_FLIGHT];
 
 uint32_t frameIndex = 0;
 bool framebufferResized = false;
@@ -184,7 +189,7 @@ void initApplication(GLFWwindow* window) {
         createInfo.poolSizeCount = ARRAY_COUNT(poolSizes);
         createInfo.pPoolSizes = poolSizes;
 
-        if (vkCreateDescriptorPool(context->device, &createInfo, NULL, &descriptorPool) != VK_SUCCESS) {
+        if (vkCreateDescriptorPool(context->device, &createInfo, NULL, &spriteDescriptorPool) != VK_SUCCESS) {
             fprintf(stderr, "Failed to create descriptorPool!\n");
             exit(-1);
         }
@@ -201,18 +206,18 @@ void initApplication(GLFWwindow* window) {
         createInfo.bindingCount = ARRAY_COUNT(bindings);
         createInfo.pBindings = bindings;
 
-        if (vkCreateDescriptorSetLayout(context->device, &createInfo, NULL, &descriptorLayout) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(context->device, &createInfo, NULL, &spriteDescriptorLayout) != VK_SUCCESS) {
             fprintf(stderr, "Failed to create descriptor layout!\n");
             exit(-1);
         }
 
         VkDescriptorSetAllocateInfo allocInfo = {0};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorPool = spriteDescriptorPool;
         allocInfo.descriptorSetCount = 1;
-        allocInfo.pSetLayouts = &descriptorLayout;
+        allocInfo.pSetLayouts = &spriteDescriptorLayout;
 
-        if (vkAllocateDescriptorSets(context->device, &allocInfo, &descriptorSet) != VK_SUCCESS) {
+        if (vkAllocateDescriptorSets(context->device, &allocInfo, &spriteDescriptorSet) != VK_SUCCESS) {
             fprintf(stderr, "Failed to allocate descriptor set!\n");
             exit(-1);
         }
@@ -225,7 +230,7 @@ void initApplication(GLFWwindow* window) {
         VkWriteDescriptorSet descriptorWrites[1];
         descriptorWrites[0] = (VkWriteDescriptorSet){0};
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = descriptorSet;
+        descriptorWrites[0].dstSet = spriteDescriptorSet;
         descriptorWrites[0].dstBinding = 0;
         descriptorWrites[0].descriptorCount = 1;
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -233,6 +238,78 @@ void initApplication(GLFWwindow* window) {
 
         vkUpdateDescriptorSets(context->device, ARRAY_COUNT(descriptorWrites), descriptorWrites, 0, NULL);
     }
+
+   {
+
+        VkDescriptorPoolSize poolSizes[] = {
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, FRAMES_IN_FLIGHT},
+        };
+
+        VkDescriptorPoolCreateInfo createInfo = {0};
+        createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        createInfo.maxSets = FRAMES_IN_FLIGHT;
+        createInfo.poolSizeCount = ARRAY_COUNT(poolSizes);
+        createInfo.pPoolSizes = poolSizes;
+
+        if (vkCreateDescriptorPool(context->device, &createInfo, NULL, &modelDescriptorPool) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to create descriptorPool!\n");
+            exit(-1);
+        }
+    }
+
+    // Uniform buffers
+    for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        createBuffer(context, &modelUniformBuffers[i], sizeof(HMM_Mat4), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    }
+
+   {
+        VkDescriptorSetLayoutBinding bindings[] = {
+            { 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, 0 },
+        };
+
+
+        VkDescriptorSetLayoutCreateInfo createInfo = {0};
+        createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        createInfo.bindingCount = ARRAY_COUNT(bindings);
+        createInfo.pBindings = bindings;
+
+        if (vkCreateDescriptorSetLayout(context->device, &createInfo, NULL, &modelDescriptorLayout) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to create descriptor layout!\n");
+            exit(-1);
+        }
+
+        for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+            VkDescriptorSetAllocateInfo allocInfo = {0};
+            allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+            allocInfo.descriptorPool = modelDescriptorPool;
+            allocInfo.descriptorSetCount = 1;
+            allocInfo.pSetLayouts = &modelDescriptorLayout;
+
+            if (vkAllocateDescriptorSets(context->device, &allocInfo, &modelDescriptorSets[i]) != VK_SUCCESS) {
+                fprintf(stderr, "Failed to allocate descriptor set!\n");
+                exit(-1);
+            }
+
+            VkDescriptorBufferInfo bufferInfo = {0};
+            bufferInfo.buffer = modelUniformBuffers[i].buffer;
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(HMM_Mat4);
+
+            VkWriteDescriptorSet descriptorWrites[1];
+            descriptorWrites[0] = (VkWriteDescriptorSet){0};
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = modelDescriptorSets[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+            vkUpdateDescriptorSets(context->device, ARRAY_COUNT(descriptorWrites), descriptorWrites, 0, NULL);
+
+        }
+
+     }
 
     VkVertexInputAttributeDescription vertexAttributeDescriptions[3] = {0};
     vertexAttributeDescriptions[0].binding = 0;
@@ -260,7 +337,7 @@ void initApplication(GLFWwindow* window) {
                                     "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/texture_frag.spv", renderPass,
                                     swapchain.width, swapchain.height, vertexAttributeDescriptions,
                                     ARRAY_COUNT(vertexAttributeDescriptions), &vertexInputBinding, 1,
-                                    &descriptorLayout, NULL);
+                                    &spriteDescriptorLayout, NULL);
 
     VkVertexInputAttributeDescription modelAttributeDescriptions[2] = {0};
     modelAttributeDescriptions[0].binding = 0;
@@ -286,7 +363,7 @@ void initApplication(GLFWwindow* window) {
     modelPipeline = createPipeline(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/model_vert.spv",
                                     "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/model_frag.spv", renderPass,
                                    swapchain.width, swapchain.height, modelAttributeDescriptions, 
-                                   ARRAY_COUNT(modelAttributeDescriptions), &modelInputBinding, 0, 0, &pushConstant);
+                                   ARRAY_COUNT(modelAttributeDescriptions), &modelInputBinding, 1, &modelDescriptorLayout, 0);
 
     for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++){
         VkFenceCreateInfo createInfo = {0};
@@ -338,14 +415,14 @@ void initApplication(GLFWwindow* window) {
         }
     }
 
-    createBuffer(context, &vertexBuffer, sizeof(vertexData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+    createBuffer(context, &spriteVertexBuffer, sizeof(vertexData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    uploadDataToBuffer(context, &vertexBuffer, vertexData, sizeof(vertexData));
+    uploadDataToBuffer(context, &spriteVertexBuffer, vertexData, sizeof(vertexData));
 
 
-    createBuffer(context, &indexBuffer, sizeof(indexData), VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+    createBuffer(context, &spriteIndexBuffer, sizeof(indexData), VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    uploadDataToBuffer(context, &indexBuffer, indexData, sizeof(indexData));
+    uploadDataToBuffer(context, &spriteIndexBuffer, indexData, sizeof(indexData));
 
     model = createModel(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/res/models/monkey.glb");
 }
@@ -521,9 +598,9 @@ void renderApplication() {
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spritePipeline.pipeline);
 
         VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.buffer, &offset);
-        vkCmdBindIndexBuffer(commandBuffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spritePipeline.layout, 0, 1, &descriptorSet, 0, 0);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &spriteVertexBuffer.buffer, &offset);
+        vkCmdBindIndexBuffer(commandBuffer, spriteIndexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, spritePipeline.layout, 0, 1, &spriteDescriptorSet, 0, 0);
 
         vkCmdDrawIndexed(commandBuffer, ARRAY_COUNT(indexData), 1, 0, 0, 0);
 #else 
@@ -539,12 +616,17 @@ void renderApplication() {
 
         HMM_Mat4 modelViewProj = HMM_MulM4(projMatrix, modelMatrix);
 
+        void* mapped;
+        vkMapMemory(context->device, modelUniformBuffers[frameIndex].memory, 0, sizeof(HMM_Mat4), 0, &mapped);
+        memcpy(mapped, &modelViewProj, sizeof(modelViewProj));
+        vkUnmapMemory(context->device, modelUniformBuffers[frameIndex].memory);
+
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline.pipeline);
 
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model.vertexBuffer.buffer, &offset);
         vkCmdBindIndexBuffer(commandBuffer, model.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
-        vkCmdPushConstants(commandBuffer, modelPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(modelViewProj), &modelViewProj);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline.layout, 0, 1, &modelDescriptorSets[frameIndex], 0, NULL);
         vkCmdDrawIndexed(commandBuffer, model.numIndices, 1, 0, 0, 0);
 
 #endif
@@ -595,15 +677,20 @@ void renderApplication() {
 void shutdownApplication() {
     vkDeviceWaitIdle(context->device);
 
-    vkDestroyDescriptorPool(context->device, descriptorPool, NULL);
-    vkDestroyDescriptorSetLayout(context->device, descriptorLayout, NULL);
+    vkDestroyDescriptorPool(context->device, modelDescriptorPool, NULL);
+    vkDestroyDescriptorSetLayout(context->device, modelDescriptorLayout, NULL);
+    for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        destroyBuffer(context, &modelUniformBuffers[i]);
+    }
+    destroyModel(context, &model);
+
+    vkDestroyDescriptorPool(context->device, spriteDescriptorPool, NULL);
+    vkDestroyDescriptorSetLayout(context->device, spriteDescriptorLayout, NULL);
 
     destroyImage(context, &image);
 
-    destroyModel(context, &model);
-
-    destroyBuffer(context, &indexBuffer);
-    destroyBuffer(context, &vertexBuffer);
+    destroyBuffer(context, &spriteIndexBuffer);
+    destroyBuffer(context, &spriteVertexBuffer);
 
     for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
         vkDestroyFence(context->device, fences[i], NULL);
