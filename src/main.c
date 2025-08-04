@@ -69,6 +69,10 @@ Camera camera;
 
 uint32_t frameIndex = 0;
 bool framebufferResized = false;
+bool disCursorMode = false;
+
+double lastMouseX = 0.0f;
+double lastMouseY = 0.0f;
 
 float vertexData[] = {
     0.5f, -0.5f,        // Pos
@@ -752,14 +756,12 @@ void updateApplication(double delta) {
     
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        disCursorMode = true;
     }
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        disCursorMode = false;
     }
-
-
-    if (camera.pitch > 89.0f) camera.pitch = 89.0f;
-    if (camera.pitch < -89.0f) camera.pitch = -89.0f;
 
     float cameraSpeed = 5.0f;
     float mouseSensi = 0.26f;
@@ -789,11 +791,25 @@ void updateApplication(double delta) {
         camera.cameraPosition = HMM_SubV3(camera.cameraPosition, tmp);
     }
 
+    double xPos, yPos;
+    glfwGetCursorPos(window, &xPos, &yPos);
 
+    double dx = xPos - lastMouseX;
+    double dy = yPos - lastMouseY;
 
+    lastMouseX = xPos;
+    lastMouseY = yPos;
+
+    if (disCursorMode) {
+        camera.yaw += dx * mouseSensi;
+        camera.pitch -= dy * mouseSensi;
+    }
+
+    if (camera.pitch > 89.0f) camera.pitch = 89.0f;
+    if (camera.pitch < -89.0f) camera.pitch = -89.0f;
 
     HMM_Vec3 front;
-    front.X = cos(degToRad(camera.pitch) * sin(degToRad(camera.yaw)));
+    front.X = cos(degToRad(camera.pitch)) * sin(degToRad(camera.yaw));
     front.Y = sin(degToRad(camera.pitch));
     front.Z = cos(degToRad(camera.pitch)) * cos(degToRad(camera.yaw));
     camera.cameraDirection = HMM_NormV3(front);
