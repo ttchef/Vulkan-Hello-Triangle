@@ -407,7 +407,7 @@ void initApplication(GLFWwindow* window) {
     modelPipeline = createPipeline(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/model_vert.spv",
                                     "/home/ttchef/coding/c/Vulkan-Hello-Triangle/shaders/model_frag.spv", renderPass,
                                    swapchain.width, swapchain.height, modelAttributeDescriptions, 
-                                   ARRAY_COUNT(modelAttributeDescriptions), &modelInputBinding, 1, &modelDescriptorLayout, 0);
+                                   ARRAY_COUNT(modelAttributeDescriptions), &modelInputBinding, 0, NULL, &pushConstant);
 
     for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++){
         VkFenceCreateInfo createInfo = {0};
@@ -636,7 +636,6 @@ void renderApplication() {
         return;
     }
 
-    
     {
         VkCommandBuffer commandBuffer = commandBuffers[frameIndex];
 
@@ -674,30 +673,43 @@ void renderApplication() {
 
         vkCmdDrawIndexed(commandBuffer, ARRAY_COUNT(indexData), 1, 0, 0, 0);
 #else 
-        HMM_Mat4 translationMatrix = HMM_Translate(HMM_V3(0.0f, 0.0f, 3.0f));
-        HMM_Mat4 scaleMatrix = HMM_Scale(HMM_V3(1.0f, 1.0f, 1.0f));
-        HMM_Mat4 rotatationMatrix = HMM_Rotate_LH(greenChannel * 10.0f, HMM_V3(0.0f, 1.0f, 0.0f));
-
-
-        HMM_Mat4 tempModel = HMM_MulM4(translationMatrix, scaleMatrix);
-        HMM_Mat4 modelMatrix = HMM_MulM4(tempModel, rotatationMatrix);
-
-        HMM_Mat4 projMatrix = getProjectionInverseZ(degToRad(80.0f), swapchain.width, swapchain.height, 0.01);
-
-        HMM_Mat4 modelViewProj = HMM_MulM4(camera.viewProj, modelMatrix);
-
-        void* mapped;
-        vkMapMemory(context->device, modelUniformBuffers[frameIndex].memory, 0, sizeof(HMM_Mat4), 0, &mapped);
-        memcpy(mapped, &modelViewProj, sizeof(modelViewProj));
-        vkUnmapMemory(context->device, modelUniformBuffers[frameIndex].memory);
-
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline.pipeline);
 
-        VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model.vertexBuffer.buffer, &offset);
-        vkCmdBindIndexBuffer(commandBuffer, model.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline.layout, 0, 1, &modelDescriptorSets[frameIndex], 0, NULL);
-        vkCmdDrawIndexed(commandBuffer, model.numIndices, 1, 0, 0, 0);
+        for (uint32_t i = 0; i < 10; i++) {
+            int32_t tmpI = i - 5;
+            for (uint32_t j = 0; j < 10; j++) {
+                int32_t tmpJ = j - 5;
+                for (uint32_t k = 0; k < 10; k++) {
+
+                    int32_t tmpK = k - 5;
+
+                    HMM_Mat4 translationMatrix = HMM_Translate(HMM_V3(tmpJ * 4, tmpI * 4, tmpK * 4));
+                    HMM_Mat4 scaleMatrix = HMM_Scale(HMM_V3(1.0f, 1.0f, 1.0f));
+                    HMM_Mat4 rotatationMatrixY = HMM_Rotate_LH(greenChannel * (k + 1) * 2, HMM_V3(0.0f, 1.0f, 0.0f));
+                    HMM_Mat4 rotatationMatrixX = HMM_Rotate_LH(greenChannel * (i + 1) * 2, HMM_V3(1.0f, 0.0f, 0.0f));
+                    HMM_Mat4 rotatationMatrixZ = HMM_Rotate_LH(greenChannel * (j + 1) * 2, HMM_V3(0.0f, 0.0f, 1.0f));
+
+                    HMM_Mat4 rotatationMatrix = HMM_MulM4(HMM_MulM4(rotatationMatrixX, rotatationMatrixY), rotatationMatrixZ);
+
+
+                    HMM_Mat4 tempModel = HMM_MulM4(translationMatrix, scaleMatrix);
+                    HMM_Mat4 modelMatrix = HMM_MulM4(tempModel, rotatationMatrix);
+
+                    HMM_Mat4 modelViewProj = HMM_MulM4(camera.viewProj, modelMatrix);
+
+                    void* mapped;
+                    vkMapMemory(context->device, modelUniformBuffers[frameIndex].memory, 0, sizeof(HMM_Mat4), 0, &mapped);
+                    memcpy(mapped, &modelViewProj, sizeof(modelViewProj));
+                    vkUnmapMemory(context->device, modelUniformBuffers[frameIndex].memory);
+
+                    VkDeviceSize offset = 0;
+                    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &model.vertexBuffer.buffer, &offset);
+                    vkCmdBindIndexBuffer(commandBuffer, model.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
+                    vkCmdPushConstants(commandBuffer, modelPipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(modelViewProj), &modelViewProj);
+                    vkCmdDrawIndexed(commandBuffer, model.numIndices, 1, 0, 0, 0);
+                }
+            }
+        }
 
 #endif
         vkCmdEndRenderPass(commandBuffer);
