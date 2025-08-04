@@ -445,7 +445,7 @@ void initApplication(GLFWwindow* window) {
     // Camera
     {
         camera.cameraPosition = HMM_V3(0.0f, 0.0f, 0.0f);
-        camera.cameraDirection = HMM_V3(0.0f, 0.0f, 0.0f);
+        camera.cameraDirection = HMM_V3(0.0f, 0.0f, 1.0f);
 
         camera.up = HMM_V3(0.0f, 1.0f, 0.0f);
         camera.yaw = 0.0f;
@@ -630,7 +630,7 @@ void renderApplication() {
 
         vkCmdDrawIndexed(commandBuffer, ARRAY_COUNT(indexData), 1, 0, 0, 0);
 #else 
-        HMM_Mat4 translationMatrix = HMM_Translate(HMM_V3(0.0f, 0.f, 3.0f));
+        HMM_Mat4 translationMatrix = HMM_Translate(HMM_V3(0.0f, 0.0f, 3.0f));
         HMM_Mat4 scaleMatrix = HMM_Scale(HMM_V3(1.0f, 1.0f, 1.0f));
         HMM_Mat4 rotatationMatrix = HMM_Rotate_LH(greenChannel * 10.0f, HMM_V3(0.0f, 1.0f, 0.0f));
 
@@ -750,15 +750,54 @@ void shutdownApplication() {
 
 void updateApplication(double delta) {
     
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+
+
     if (camera.pitch > 89.0f) camera.pitch = 89.0f;
     if (camera.pitch < -89.0f) camera.pitch = -89.0f;
+
+    float cameraSpeed = 5.0f;
+    float mouseSensi = 0.26f;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(HMM_MulV3(camera.cameraDirection, HMM_V3(1.0f, 0.0f, 1.0f))), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_AddV3(camera.cameraPosition, tmp);
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(HMM_MulV3(camera.cameraDirection, HMM_V3(1.0f, 0.0f, 1.0f))), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_SubV3(camera.cameraPosition, tmp);
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(HMM_Cross(camera.cameraDirection, camera.up)), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_AddV3(camera.cameraPosition, tmp);
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(HMM_Cross(camera.cameraDirection, camera.up)), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_SubV3(camera.cameraPosition, tmp);
+    }
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(camera.up), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_AddV3(camera.cameraPosition, tmp);
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(camera.up), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_SubV3(camera.cameraPosition, tmp);
+    }
+
+
+
 
     HMM_Vec3 front;
     front.X = cos(degToRad(camera.pitch) * sin(degToRad(camera.yaw)));
     front.Y = sin(degToRad(camera.pitch));
     front.Z = cos(degToRad(camera.pitch)) * cos(degToRad(camera.yaw));
     camera.cameraDirection = HMM_NormV3(front);
-    camera.proj = getProjectionInverseZ(45.0f, swapchain.width, swapchain.height, 0.01f);
+    camera.proj = getProjectionInverseZ(degToRad(45.0f), swapchain.width, swapchain.height, 0.01f);
     camera.view = HMM_LookAt_LH(camera.cameraPosition, HMM_AddV3(camera.cameraPosition, camera.cameraDirection), camera.up);
     camera.viewProj = HMM_MulM4(camera.proj, camera.view);
 }
