@@ -69,7 +69,7 @@ VulkanSwapchain createSwapchain(GLFWwindow* window, VulkanContext* context, VkSu
 void destroySwapchain(VulkanContext* context, VulkanSwapchain* swapchain);
 
 // vulkan_renderpass.c 
-VkRenderPass createRenderPass(VulkanContext* context, VkFormat format);
+VkRenderPass createRenderPass(VulkanContext* context, VkFormat format, VkSampleCountFlagBits sampleCount);
 void destroyRenderPass(VulkanContext* context, VkRenderPass renderPass);
 
 // vulkan_pipeline.c 
@@ -88,7 +88,7 @@ void destroyBuffer(VulkanContext* context, VulkanBuffer* buffer);
 uint32_t findMemoryType(VulkanContext* context, uint32_t typeFilter, VkMemoryPropertyFlags memoryProperties);
 void uploadDataToBuffer(VulkanContext* context, VulkanBuffer* buffer, void* data, size_t size);
 void createImage(VulkanContext* context, VulkanImage* image, uint32_t width, uint32_t height,
-                 VkFormat format, VkImageUsageFlags usage);
+                 VkFormat format, VkImageUsageFlags usage, VkSampleCountFlagBits sampleCount);
 void destroyImage(VulkanContext* context, VulkanImage* image);
 void uploadDataToImage(VulkanContext* context, VulkanImage* image, void* data,
                        uint32_t size, uint32_t width, uint32_t height,

@@ -158,7 +158,7 @@ void destroyBuffer(VulkanContext *context, VulkanBuffer *buffer) {
 }
 
 void createImage(VulkanContext *context, VulkanImage *image, uint32_t width, uint32_t height,
-                 VkFormat format, VkImageUsageFlags usage) {
+                 VkFormat format, VkImageUsageFlags usage, VkSampleCountFlagBits sampleCount) {
     {
         VkImageCreateInfo createInfo = {0};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -172,7 +172,7 @@ void createImage(VulkanContext *context, VulkanImage *image, uint32_t width, uin
         createInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         createInfo.usage = usage;
-        createInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        createInfo.samples = sampleCount;
         createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
         if (vkCreateImage(context->device, &createInfo, NULL, &image->image) != VK_SUCCESS) {

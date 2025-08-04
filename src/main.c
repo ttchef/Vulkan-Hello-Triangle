@@ -43,8 +43,11 @@ VulkanContext* context;
 VkSurfaceKHR surface;
 VulkanSwapchain swapchain;
 VkRenderPass renderPass;
+
 VkFramebuffer* framebuffers;
 VulkanImage* depthBuffers;
+VulkanImage* colorBuffers;
+
 VkCommandPool commandPools[FRAMES_IN_FLIGHT];
 VkCommandBuffer commandBuffers[FRAMES_IN_FLIGHT];
 VkFence fences[FRAMES_IN_FLIGHT];
@@ -202,7 +205,7 @@ void initApplication(GLFWwindow* window) {
             exit(-1);
         }
 
-        createImage(context, &image, width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+        createImage(context, &image, width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_SAMPLE_COUNT_1_BIT);
         uploadDataToImage(context, &image, data, width * height * 4,
                           width, height, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
         stbi_image_free(data);
@@ -498,12 +501,21 @@ void recreateRenderPass() {
         }
     }
 
+    if (!colorBuffers) {
+        colorBuffers = malloc(sizeof(VulkanImage) * swapchain.imagesCount);
+        if (!colorBuffers) {
+            fprintf(stderr, "Failed to allocate colorBuffers!\n");
+            exit(-1);
+        }
+    }
+
     if (renderPass) {
         destroyRenderPass(context, renderPass);
 
         for (uint32_t i = 0; i < swapchain.imagesCount; i++) {
             vkDestroyFramebuffer(context->device, framebuffers[i], NULL);
             destroyImage(context, &depthBuffers[i]);
+            destroyImage(context, &colorBuffers[i]);
         }
     }
 
@@ -519,14 +531,22 @@ void recreateRenderPass() {
         exit(-1);
     }
 
-    renderPass = createRenderPass(context, swapchain.format);
+    colorBuffers = realloc(colorBuffers, sizeof(VulkanImage) * swapchain.imagesCount);
+    if (!colorBuffers) {
+        fprintf(stderr, "Failed to reallocate colorBuffers!\n");
+        exit(-1);
+    }
+
+    renderPass = createRenderPass(context, swapchain.format, VK_SAMPLE_COUNT_4_BIT);
 
     for (uint32_t i = 0; i < swapchain.imagesCount; i++) {
-        createImage(context, &depthBuffers[i], swapchain.width, swapchain.height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+        createImage(context, &depthBuffers[i], swapchain.width, swapchain.height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_SAMPLE_COUNT_4_BIT);
+        createImage(context, &colorBuffers[i], swapchain.width, swapchain.height, swapchain.format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_SAMPLE_COUNT_4_BIT);
 
         VkImageView attachments[] = {
-            swapchain.imageViews[i],
+            colorBuffers[i].view,
             depthBuffers[i].view,
+            swapchain.imageViews[i],
         };
 
         VkFramebufferCreateInfo createInfo = {0};
@@ -788,6 +808,7 @@ void shutdownApplication() {
     for (uint32_t i = 0; i < swapchain.imagesCount; i++) {
         vkDestroyFramebuffer(context->device, framebuffers[i], NULL);
         destroyImage(context, &depthBuffers[i]);
+        destroyImage(context, &colorBuffers[i]);
     }
 
     destroyRenderPass(context, renderPass);

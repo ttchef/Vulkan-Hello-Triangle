@@ -101,7 +101,7 @@ VulkanPipeline createPipeline(VulkanContext *context, const char *vertPath, cons
 
     VkPipelineMultisampleStateCreateInfo multisampleState = {0};
     multisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_4_BIT;
 
     VkPipelineDepthStencilStateCreateInfo depthStancilState = {0};
     depthStancilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
