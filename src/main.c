@@ -461,7 +461,6 @@ void renderApplication() {
     // getting image from swapchain
     VkResult result = vkAcquireNextImageKHR(context->device, swapchain.swapchain, UINT64_MAX, acrquireSemaphores[frameIndex], 0, &imageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
-        fprintf(stderr, "Resize!\n");
         framebufferResized = false;
         recreateSwapchain();
         return;
@@ -582,7 +581,6 @@ void renderApplication() {
 
     result = vkQueuePresentKHR(context->graphicsQueue.queue, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
-        fprintf(stderr, "Resize!\n");
         framebufferResized = false;
         recreateSwapchain();
     }
@@ -653,7 +651,7 @@ int main() {
         return -1;
     }
 
-    //glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 
     initApplication(window);
 
