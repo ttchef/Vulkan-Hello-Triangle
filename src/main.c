@@ -580,8 +580,16 @@ void renderApplication() {
 
     static double frameGpuAvg = 0.0;
     static float greenChannel = 0.0f;
+    static float redChannel = 0.0f;
+    static float blueChannel = 0.0f;
     greenChannel = (sin(glfwGetTime()) + 1) / 2;
     if (greenChannel > 1.0f) greenChannel = 0.0f;
+
+    redChannel = (cos(glfwGetTime()) + 1) / 2;
+    if (redChannel > 1.0f) redChannel = 0.0f;
+
+    blueChannel = (tan(glfwGetTime()) + 1) / 2;
+    if (blueChannel > 1.0f) blueChannel = 0.0f;
 
     uint32_t imageIndex = 0;
 
