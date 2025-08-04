@@ -20,6 +20,21 @@
 
 #define USE_MODEL_PIPELINE
 
+void recreateRenderPass();
+
+typedef struct {
+    HMM_Vec3 cameraPosition;
+    HMM_Vec3 cameraDirection;
+    HMM_Vec3 up;
+
+    float yaw;
+    float pitch;
+
+    HMM_Mat4 viewProj;
+    HMM_Mat4 view;
+    HMM_Mat4 proj;
+} Camera;
+
 GLFWwindow* window;
 
 VulkanContext* context;
@@ -50,8 +65,14 @@ VkDescriptorPool modelDescriptorPool;
 VkDescriptorSet modelDescriptorSets[FRAMES_IN_FLIGHT];
 VulkanBuffer modelUniformBuffers[FRAMES_IN_FLIGHT];
 
+Camera camera;
+
 uint32_t frameIndex = 0;
 bool framebufferResized = false;
+bool disCursorMode = false;
+
+double lastMouseX = 0.0f;
+double lastMouseY = 0.0f;
 
 float vertexData[] = {
     0.5f, -0.5f,        // Pos
@@ -76,7 +97,6 @@ uint32_t indexData[] = {
     3, 0, 2
 };
 
-void recreateRenderPass();
 
 static float degToRad(float deg) {
     return deg * (HMM_PI32 / 180.0f);
@@ -425,6 +445,16 @@ void initApplication(GLFWwindow* window) {
     uploadDataToBuffer(context, &spriteIndexBuffer, indexData, sizeof(indexData));
 
     model = createModel(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/res/models/monkey.glb");
+
+    // Camera
+    {
+        camera.cameraPosition = HMM_V3(0.0f, 0.0f, 0.0f);
+        camera.cameraDirection = HMM_V3(0.0f, 0.0f, 1.0f);
+
+        camera.up = HMM_V3(0.0f, 1.0f, 0.0f);
+        camera.yaw = 0.0f;
+        camera.pitch = 0.0f;
+    }
 }
 
 void recreateRenderPass() {
@@ -604,9 +634,9 @@ void renderApplication() {
 
         vkCmdDrawIndexed(commandBuffer, ARRAY_COUNT(indexData), 1, 0, 0, 0);
 #else 
-        HMM_Mat4 translationMatrix = HMM_Translate(HMM_V3(0.0f, 0.f, 3.0f));
+        HMM_Mat4 translationMatrix = HMM_Translate(HMM_V3(0.0f, 0.0f, 3.0f));
         HMM_Mat4 scaleMatrix = HMM_Scale(HMM_V3(1.0f, 1.0f, 1.0f));
-        HMM_Mat4 rotatationMatrix = HMM_Rotate_RH(greenChannel * 10.0f, HMM_V3(0.0f, 1.0f, 0.0f));
+        HMM_Mat4 rotatationMatrix = HMM_Rotate_LH(greenChannel * 10.0f, HMM_V3(0.0f, 1.0f, 0.0f));
 
 
         HMM_Mat4 tempModel = HMM_MulM4(translationMatrix, scaleMatrix);
@@ -614,7 +644,7 @@ void renderApplication() {
 
         HMM_Mat4 projMatrix = getProjectionInverseZ(degToRad(80.0f), swapchain.width, swapchain.height, 0.01);
 
-        HMM_Mat4 modelViewProj = HMM_MulM4(projMatrix, modelMatrix);
+        HMM_Mat4 modelViewProj = HMM_MulM4(camera.viewProj, modelMatrix);
 
         void* mapped;
         vkMapMemory(context->device, modelUniformBuffers[frameIndex].memory, 0, sizeof(HMM_Mat4), 0, &mapped);
@@ -722,6 +752,72 @@ void shutdownApplication() {
 
 }
 
+void updateApplication(double delta) {
+    
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        disCursorMode = true;
+    }
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        disCursorMode = false;
+    }
+
+    float cameraSpeed = 5.0f;
+    float mouseSensi = 0.26f;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(HMM_MulV3(camera.cameraDirection, HMM_V3(1.0f, 0.0f, 1.0f))), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_AddV3(camera.cameraPosition, tmp);
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(HMM_MulV3(camera.cameraDirection, HMM_V3(1.0f, 0.0f, 1.0f))), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_SubV3(camera.cameraPosition, tmp);
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(HMM_Cross(camera.cameraDirection, camera.up)), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_AddV3(camera.cameraPosition, tmp);
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(HMM_Cross(camera.cameraDirection, camera.up)), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_SubV3(camera.cameraPosition, tmp);
+    }
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(camera.up), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_AddV3(camera.cameraPosition, tmp);
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        HMM_Vec3 tmp = HMM_MulV3F(HMM_MulV3F(HMM_NormV3(camera.up), (float)delta), cameraSpeed);
+        camera.cameraPosition = HMM_SubV3(camera.cameraPosition, tmp);
+    }
+
+    double xPos, yPos;
+    glfwGetCursorPos(window, &xPos, &yPos);
+
+    double dx = xPos - lastMouseX;
+    double dy = yPos - lastMouseY;
+
+    lastMouseX = xPos;
+    lastMouseY = yPos;
+
+    if (disCursorMode) {
+        camera.yaw += dx * mouseSensi;
+        camera.pitch -= dy * mouseSensi;
+    }
+
+    if (camera.pitch > 89.0f) camera.pitch = 89.0f;
+    if (camera.pitch < -89.0f) camera.pitch = -89.0f;
+
+    HMM_Vec3 front;
+    front.X = cos(degToRad(camera.pitch)) * sin(degToRad(camera.yaw));
+    front.Y = sin(degToRad(camera.pitch));
+    front.Z = cos(degToRad(camera.pitch)) * cos(degToRad(camera.yaw));
+    camera.cameraDirection = HMM_NormV3(front);
+    camera.proj = getProjectionInverseZ(degToRad(45.0f), swapchain.width, swapchain.height, 0.01f);
+    camera.view = HMM_LookAt_LH(camera.cameraPosition, HMM_AddV3(camera.cameraPosition, camera.cameraDirection), camera.up);
+    camera.viewProj = HMM_MulM4(camera.proj, camera.view);
+}
+
 int main() {
 
     if (!glfwInit()) {
@@ -742,9 +838,17 @@ int main() {
 
     initApplication(window);
 
+    double delta = 0.0f;
+    double lastTime = glfwGetTime();
+
     while (!glfwWindowShouldClose(window)) {
+        updateApplication(delta);
         renderApplication();
         glfwPollEvents();
+
+        double currentTime = glfwGetTime();
+        delta = currentTime - lastTime;
+        lastTime = currentTime;
     }
 
     shutdownApplication();
