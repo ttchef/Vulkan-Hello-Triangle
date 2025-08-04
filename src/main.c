@@ -73,6 +73,7 @@ bool disCursorMode = false;
 
 double lastMouseX = 0.0f;
 double lastMouseY = 0.0f;
+float cameraFov = 90.0f;
 
 float vertexData[] = {
     0.5f, -0.5f,        // Pos
@@ -100,6 +101,12 @@ uint32_t indexData[] = {
 
 static float degToRad(float deg) {
     return deg * (HMM_PI32 / 180.0f);
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    cameraFov += (yoffset * -3);
+    if (cameraFov < 0.0f) cameraFov = 0.0f;
+    else if (cameraFov > 160.0f) cameraFov = 160.0f;
 }
 
 void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
@@ -813,7 +820,7 @@ void updateApplication(double delta) {
     front.Y = sin(degToRad(camera.pitch));
     front.Z = cos(degToRad(camera.pitch)) * cos(degToRad(camera.yaw));
     camera.cameraDirection = HMM_NormV3(front);
-    camera.proj = getProjectionInverseZ(degToRad(45.0f), swapchain.width, swapchain.height, 0.01f);
+    camera.proj = getProjectionInverseZ(degToRad(cameraFov), swapchain.width, swapchain.height, 0.01f);
     camera.view = HMM_LookAt_LH(camera.cameraPosition, HMM_AddV3(camera.cameraPosition, camera.cameraDirection), camera.up);
     camera.viewProj = HMM_MulM4(camera.proj, camera.view);
 }
@@ -835,6 +842,7 @@ int main() {
     }
 
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    glfwSetScrollCallback(window, scroll_callback);
 
     initApplication(window);
 
