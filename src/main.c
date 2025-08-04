@@ -18,7 +18,7 @@
 
 #define FRAMES_IN_FLIGHT 2
 
-#define USE_MODEL_PIPELINE
+//#define USE_MODEL_PIPELINE
 
 GLFWwindow* window;
 
