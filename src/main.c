@@ -299,7 +299,7 @@ void initApplication(GLFWwindow* window) {
 
     // Uniform buffers
     for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++) {
-        createBuffer(context, &modelUniformBuffers[i], sizeof(HMM_Mat4), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        createBuffer(context, &modelUniformBuffers[i], sizeof(HMM_Mat4) * 2, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     }
 
@@ -335,7 +335,7 @@ void initApplication(GLFWwindow* window) {
             VkDescriptorBufferInfo bufferInfo = {0};
             bufferInfo.buffer = modelUniformBuffers[i].buffer;
             bufferInfo.offset = 0;
-            bufferInfo.range = sizeof(HMM_Mat4);
+            bufferInfo.range = sizeof(HMM_Mat4) * 2;
 
             VkDescriptorImageInfo imageInfo = {0};
             imageInfo.sampler = sampler;
@@ -727,11 +727,13 @@ void renderApplication() {
 
         HMM_Mat4 projMatrix = getProjectionInverseZ(degToRad(80.0f), swapchain.width, swapchain.height, 0.01);
 
+        HMM_Mat4 modelView = HMM_MulM4(camera.view, modelMatrix);
         HMM_Mat4 modelViewProj = HMM_MulM4(camera.viewProj, modelMatrix);
 
         void* mapped;
-        vkMapMemory(context->device, modelUniformBuffers[frameIndex].memory, 0, sizeof(HMM_Mat4), 0, &mapped);
+        vkMapMemory(context->device, modelUniformBuffers[frameIndex].memory, 0, sizeof(HMM_Mat4) * 2, 0, &mapped);
         memcpy(mapped, &modelViewProj, sizeof(modelViewProj));
+        memcpy((uint8_t*)mapped + sizeof(HMM_Mat4), &modelView, sizeof(modelView));
         vkUnmapMemory(context->device, modelUniformBuffers[frameIndex].memory);
 
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline.pipeline);
