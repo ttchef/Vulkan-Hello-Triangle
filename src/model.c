@@ -3,8 +3,12 @@
 #include <assert.h>
 #include <vulkan/vulkan_core.h>
 
+#include "../include/vulkan_base.h"
+
 #define CGLTF_IMPLEMENTATION
 #include "../vendor/cgltf/cgltf.h"
+
+#include "../vendor/stb/stb_image.h"
 
 // stride in bytes and element size in bytes
 void fillBuffer(uint32_t inputStride, void* inputData, uint32_t outputStride, void* outputData,
@@ -33,7 +37,6 @@ Model createModel(VulkanContext *context, const char *filepath) {
             assert(data->meshes_count == 1);
             assert(data->meshes[0].primitives_count == 1);
             assert(data->meshes[0].primitives[0].attributes_count > 0);
-            assert(data->meshes[0].primitives[0].attributes[0].type == cgltf_attribute_type_position);
             assert(data->meshes[0].primitives[0].indices->component_type == cgltf_component_type_r_16u);
             assert(data->meshes[0].primitives[0].indices->stride == sizeof(uint16_t));
             
@@ -48,34 +51,69 @@ Model createModel(VulkanContext *context, const char *filepath) {
             result.numIndices = data->meshes[0].primitives[0].indices->count;
 
             // Vertices
+            uint64_t outputStride = sizeof(float) * 8;
             uint64_t numVertices = data->meshes[0].primitives[0].attributes->data->count;
-            uint64_t vertexDataSize = sizeof(float) * 6 * numVertices; // pos and normal
+            uint64_t vertexDataSize = outputStride * numVertices; // pos and normal
             uint8_t* vertexData = malloc(sizeof(uint8_t) * vertexDataSize);
 
             for (uint64_t i = 0; i < data->meshes[0].primitives[0].attributes_count; i++) {
-                cgltf_attribute* attribute = data->meshes[0].primitives[0].attributes + i; // not [i] because of ptr
+                cgltf_attribute* attribute = data->meshes[0].primitives[0].attributes + i; // not [i] because of pr
+                bufferBase = (uint8_t*)attribute->data->buffer_view->buffer->data;
+                uint64_t inputStride = attribute->data->stride;
                 if (attribute->type == cgltf_attribute_type_position) {
-                    bufferBase = (uint8_t*)attribute->data->buffer_view->buffer->data;
                     uint64_t positionDataSize = attribute->data->buffer_view->size;
                     void* positionData = bufferBase + attribute->data->buffer_view->offset;
-                    fillBuffer(sizeof(float) * 3, positionData, sizeof(float) * 6, vertexData, numVertices, sizeof(float) * 3);
+                    fillBuffer(inputStride, positionData, outputStride, vertexData, numVertices, sizeof(float) * 3);
                 }
                 else if (attribute->type == cgltf_attribute_type_normal) {
-                    assert(data->meshes[0].primitives[0].attributes[0].data->stride == sizeof(float) * 3);
-                    bufferBase = (uint8_t*)attribute->data->buffer_view->buffer->data;
                     uint64_t normalDataSize = attribute->data->buffer_view->size;
                     void* normalData = bufferBase + attribute->data->buffer_view->offset;
-                    fillBuffer(sizeof(float) * 3, normalData, sizeof(float) * 6, vertexData + (sizeof(float) * 3), numVertices, sizeof(float) * 3);
+                    fillBuffer(inputStride, normalData, outputStride, vertexData + (sizeof(float) * 3), numVertices, sizeof(float) * 3);
+                }
+                else if (attribute->type == cgltf_attribute_type_texcoord) {
+                    void* texcoordData = bufferBase + attribute->data->buffer_view->offset;
+                    fillBuffer(inputStride, texcoordData, outputStride, vertexData + (sizeof(float) * 6), numVertices, sizeof(float) * 2);
                 }
             }
 
             createBuffer(context, &result.vertexBuffer, vertexDataSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
             uploadDataToBuffer(context, &result.vertexBuffer, vertexData, vertexDataSize);
+            free(vertexData);
 
+            // Material
+            assert(data->materials_count == 1);
+            cgltf_material* material = &data->materials[0];
+            assert(material->has_pbr_metallic_roughness);
+            cgltf_texture_view albedoTextureView = material->pbr_metallic_roughness.base_color_texture;
+            assert(!albedoTextureView.has_transform);
+            assert(albedoTextureView.texcoord == 0);
+            assert(albedoTextureView.texture);
+            cgltf_texture* albedoTexture = albedoTextureView.texture;
+
+            // Load texture
+            cgltf_buffer_view* bufferView = albedoTexture->image->buffer_view;
+            assert(bufferView->size < INT32_MAX);
+            int bpp, width, height;
+            uint8_t* textureData = stbi_load_from_memory((stbi_uc*)bufferView->buffer->data, (int)bufferView->size, &width, &height, &bpp, 4);
+            assert(textureData);
+            bpp = 4;
+            createImage(context, &result.albedoTexture, width, height, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT |
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_SAMPLE_COUNT_1_BIT);
+            uploadDataToImage(context, &result.albedoTexture, textureData, width * height * bpp, width, height,
+                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT);
+            stbi_image_free(textureData);
+        }
+        else {
+            fprintf(stderr, "Could not load additional buffers!\n");
+            exit(-1);
         }
         
         cgltf_free(data);
+    }
+    else {
+        fprintf(stderr, "Could not load Model!\n");
+        exit(-1);
     }
 
     return result;
@@ -84,6 +122,7 @@ Model createModel(VulkanContext *context, const char *filepath) {
 void destroyModel(VulkanContext *context, Model *model) {
     destroyBuffer(context, &model->vertexBuffer);
     destroyBuffer(context, &model->indexBuffer);
+    destroyImage(context, &model->albedoTexture);
     *model = (Model){0};
 }
 

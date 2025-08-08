@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 #include <vulkan/vulkan_core.h>
 
 #define GLFW_INCLUDE_VULKAN
@@ -19,7 +20,7 @@
 #define FRAMES_IN_FLIGHT 2
 
 #define USE_MODEL_PIPELINE
-#define LOG_GPU_TIME
+//#define LOG_GPU_TIME
 //#define LOG_CPU_TIME
 
 void recreateRenderPass();
@@ -175,6 +176,10 @@ void initApplication(GLFWwindow* window) {
 
     recreateRenderPass();
 
+    // Load Model
+    //model = createModel(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/res/models/monkey.glb");
+    model = createModel(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/res/models/BoomBox.glb");
+
     {
         VkSamplerCreateInfo createInfo = {0};
         createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -276,7 +281,8 @@ void initApplication(GLFWwindow* window) {
    {
 
         VkDescriptorPoolSize poolSizes[] = {
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, FRAMES_IN_FLIGHT},
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, FRAMES_IN_FLIGHT },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, FRAMES_IN_FLIGHT },
         };
 
         VkDescriptorPoolCreateInfo createInfo = {0};
@@ -300,6 +306,7 @@ void initApplication(GLFWwindow* window) {
    {
         VkDescriptorSetLayoutBinding bindings[] = {
             { 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, 0 },
+            { 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler }, // &sampler is optional as immutable
         };
 
 
@@ -330,7 +337,12 @@ void initApplication(GLFWwindow* window) {
             bufferInfo.offset = 0;
             bufferInfo.range = sizeof(HMM_Mat4);
 
-            VkWriteDescriptorSet descriptorWrites[1];
+            VkDescriptorImageInfo imageInfo = {0};
+            imageInfo.sampler = sampler;
+            imageInfo.imageView = model.albedoTexture.view;
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            VkWriteDescriptorSet descriptorWrites[2];
             descriptorWrites[0] = (VkWriteDescriptorSet){0};
             descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrites[0].dstSet = modelDescriptorSets[i];
@@ -338,6 +350,14 @@ void initApplication(GLFWwindow* window) {
             descriptorWrites[0].descriptorCount = 1;
             descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+            descriptorWrites[1] = (VkWriteDescriptorSet){0};
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = modelDescriptorSets[i];
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].descriptorCount = 1;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[1].pImageInfo = &imageInfo;
 
             vkUpdateDescriptorSets(context->device, ARRAY_COUNT(descriptorWrites), descriptorWrites, 0, NULL);
 
@@ -386,7 +406,7 @@ void initApplication(GLFWwindow* window) {
                                     ARRAY_COUNT(vertexAttributeDescriptions), &vertexInputBinding, 1,
                                     &spriteDescriptorLayout, NULL);
 
-    VkVertexInputAttributeDescription modelAttributeDescriptions[2] = {0};
+    VkVertexInputAttributeDescription modelAttributeDescriptions[3] = {0};
     modelAttributeDescriptions[0].binding = 0;
     modelAttributeDescriptions[0].location = 0;
     modelAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -397,10 +417,15 @@ void initApplication(GLFWwindow* window) {
     modelAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
     modelAttributeDescriptions[1].offset = sizeof(float) * 3;
 
+    modelAttributeDescriptions[2].binding = 0;
+    modelAttributeDescriptions[2].location = 2;
+    modelAttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+    modelAttributeDescriptions[2].offset = sizeof(float) * 6;
+
     VkVertexInputBindingDescription modelInputBinding = {0};
     modelInputBinding.binding = 0;
     modelInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    modelInputBinding.stride = sizeof(float) * 6;
+    modelInputBinding.stride = sizeof(float) * 8;
 
     VkPushConstantRange pushConstant = {0};
     pushConstant.offset = 0;
@@ -470,8 +495,6 @@ void initApplication(GLFWwindow* window) {
     createBuffer(context, &spriteIndexBuffer, sizeof(indexData), VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     uploadDataToBuffer(context, &spriteIndexBuffer, indexData, sizeof(indexData));
-
-    model = createModel(context, "/home/ttchef/coding/c/Vulkan-Hello-Triangle/res/models/monkey.glb");
 
     // Camera
     {
@@ -695,7 +718,7 @@ void renderApplication() {
         vkCmdDrawIndexed(commandBuffer, ARRAY_COUNT(indexData), 1, 0, 0, 0);
 #else 
         HMM_Mat4 translationMatrix = HMM_Translate(HMM_V3(0.0f, 0.0f, 3.0f));
-        HMM_Mat4 scaleMatrix = HMM_Scale(HMM_V3(1.0f, 1.0f, 1.0f));
+        HMM_Mat4 scaleMatrix = HMM_Scale(HMM_V3(100.0f, 100.0f, 100.0f));
         HMM_Mat4 rotatationMatrix = HMM_Rotate_LH(greenChannel * 10.0f, HMM_V3(0.0f, 1.0f, 0.0f));
 
 

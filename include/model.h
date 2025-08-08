@@ -8,6 +8,7 @@ typedef struct {
     VulkanBuffer vertexBuffer;
     VulkanBuffer indexBuffer;
     uint64_t numIndices;
+    VulkanImage albedoTexture; // color texture
 } Model;
 
 Model createModel(VulkanContext* context, const char* filepath);
